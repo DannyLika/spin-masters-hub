@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Trophy, Swords, LayoutDashboard, Package, BookOpen } from "lucide-react";
+import { Menu, X, Swords, LayoutDashboard, Package, BookOpen } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Home", icon: Swords },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/tournaments", label: "Tournaments", icon: Trophy },
   { href: "/inventory", label: "Inventory", icon: Package },
   { href: "/rules", label: "Rules", icon: BookOpen },
 ];
