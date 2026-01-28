@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Tournaments from "./pages/Tournaments";
 import Inventory from "./pages/Inventory";
+import Rules from "./pages/Rules";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/tournaments" element={<Tournaments />} />
           <Route path="/inventory" element={<Inventory />} />
+          <Route path="/rules" element={<Rules />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
