@@ -3,9 +3,9 @@ import { cn } from "@/lib/utils";
 interface BeybladeCardProps {
   name: string;
   type: "Attack" | "Defense" | "Stamina" | "Balance";
-  attack: number;
-  defense: number;
-  stamina: number;
+  attack: number | null;
+  defense: number | null;
+  stamina: number | null;
   wins: number;
   losses: number;
   imageUrl?: string;
@@ -37,6 +37,7 @@ export function BeybladeCard({
   className,
 }: BeybladeCardProps) {
   const winRate = wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
+  const hasStats = attack !== null && defense !== null && stamina !== null;
 
   return (
     <div
@@ -91,22 +92,38 @@ export function BeybladeCard({
           </div>
           <div className="text-muted-foreground">{wins + losses} battles</div>
         </div>
+        {!hasStats && (
+          <div className="text-xs text-muted-foreground mt-2">
+            Performance stats not set.
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function StatBar({ label, value, color }: { label: string; value: number; color: string }) {
+function StatBar({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: number | null;
+  color: string;
+}) {
+  const safeValue = value ?? 0;
+  const displayValue = value ?? "—";
+
   return (
     <div className="flex items-center gap-2">
       <span className="text-xs font-display text-muted-foreground w-8">{label}</span>
       <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
         <div
           className={cn("h-full rounded-full transition-all duration-500", color)}
-          style={{ width: `${value}%` }}
+          style={{ width: `${safeValue}%` }}
         />
       </div>
-      <span className="text-xs font-bold text-foreground w-6 text-right">{value}</span>
+      <span className="text-xs font-bold text-foreground w-6 text-right">{displayValue}</span>
     </div>
   );
 }

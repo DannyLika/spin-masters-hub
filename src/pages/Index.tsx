@@ -1,23 +1,186 @@
+import { useEffect, useState } from "react";
+import { formatDistanceToNow } from "date-fns";
 import { Navbar } from "@/components/Navbar";
 import { BeybladeCard } from "@/components/BeybladeCard";
 import { RecentBattle } from "@/components/RecentBattle";
 import { Swords, Users, Zap, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 
-const topBeyblades = [
-  { name: "Valkyrie Wing", type: "Attack" as const, attack: 85, defense: 45, stamina: 60, wins: 12, losses: 4 },
-  { name: "Longinus Destroy", type: "Attack" as const, attack: 92, defense: 38, stamina: 55, wins: 9, losses: 5 },
-  { name: "Spriggan Requiem", type: "Balance" as const, attack: 75, defense: 70, stamina: 75, wins: 15, losses: 3 },
-];
+type BeyType = "Attack" | "Defense" | "Stamina" | "Balance";
 
-const recentBattles = [
-  { player1: "Alex", player2: "Jordan", bey1: "Valkyrie Wing", bey2: "Longinus", winner: 1 as const, date: "Today" },
-  { player1: "Sam", player2: "Riley", bey1: "Spriggan", bey2: "Achilles", winner: 2 as const, date: "Yesterday" },
-  { player1: "Casey", player2: "Morgan", bey1: "Fafnir", bey2: "Valkyrie", winner: 1 as const, date: "2 days ago" },
-];
+type BeybladeRow = {
+  id: string;
+  name: string;
+  type: string;
+  attack: number | null;
+  defense: number | null;
+  stamina: number | null;
+};
+
+type TopBeyblade = BeybladeRow & {
+  type: BeyType;
+  wins: number;
+  losses: number;
+};
+
+type MatchParticipantRow = {
+  is_winner: boolean;
+  players: { display_name: string } | null;
+  beyblades: { name: string } | null;
+};
+
+type MatchRow = {
+  id: string;
+  played_at: string | null;
+  match_participants: MatchParticipantRow[] | null;
+};
+
+type RecentBattleItem = {
+  player1: string;
+  player2: string;
+  bey1: string;
+  bey2: string;
+  winner: 1 | 2;
+  date: string;
+};
+
+const allowedTypes: BeyType[] = ["Attack", "Defense", "Stamina", "Balance"];
 
 export default function Index() {
+  const [topBeyblades, setTopBeyblades] = useState<TopBeyblade[]>([]);
+  const [recentBattles, setRecentBattles] = useState<RecentBattleItem[]>([]);
+  const [totals, setTotals] = useState({ battles: 0, players: 0, beyblades: 0 });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setIsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadDashboard = async () => {
+      setIsLoading(true);
+
+      const [{ data: beyData, error: beyError }, { data: participantData, error: participantError }] =
+        await Promise.all([
+          supabase
+            .from("beyblades")
+            .select("id, name, type, attack, defense, stamina"),
+          supabase
+            .from("match_participants")
+            .select("beyblade_id, is_winner"),
+        ]);
+
+      if (beyError) {
+        console.error("Failed to load beyblades:", beyError);
+      }
+
+      if (participantError) {
+        console.error("Failed to load match participants:", participantError);
+      }
+
+      const statsByBey = new Map<string, { wins: number; losses: number }>();
+      (participantData ?? []).forEach((participant) => {
+        if (!participant.beyblade_id) return;
+        const current = statsByBey.get(participant.beyblade_id) ?? { wins: 0, losses: 0 };
+        if (participant.is_winner) {
+          current.wins += 1;
+        } else {
+          current.losses += 1;
+        }
+        statsByBey.set(participant.beyblade_id, current);
+      });
+
+      const normalized = (beyData ?? []).map((bey) => {
+        const normalizedType = allowedTypes.includes(bey.type as BeyType)
+          ? (bey.type as BeyType)
+          : "Balance";
+        const stats = statsByBey.get(bey.id) ?? { wins: 0, losses: 0 };
+        return {
+          ...bey,
+          type: normalizedType,
+          wins: stats.wins,
+          losses: stats.losses,
+        };
+      });
+
+      const ranked = normalized
+        .map((bey) => {
+          const total = bey.wins + bey.losses;
+          const winRate = total > 0 ? bey.wins / total : 0;
+          return { bey, total, winRate };
+        })
+        .sort((a, b) => b.winRate - a.winRate || b.total - a.total)
+        .slice(0, 3)
+        .map((entry) => entry.bey);
+
+      const { data: matchData, error: matchError } = await supabase
+        .from("matches")
+        .select("id, played_at, match_participants(is_winner, players(display_name), beyblades(name))")
+        .order("played_at", { ascending: false })
+        .limit(5);
+
+      if (matchError) {
+        console.error("Failed to load matches:", matchError);
+      }
+
+      const recent = (matchData ?? [])
+        .map((match): RecentBattleItem | null => {
+          const participants = match.match_participants ?? [];
+          if (participants.length < 2) return null;
+
+          const [first, second] = participants;
+          const winner: 1 | 2 = first.is_winner ? 1 : second.is_winner ? 2 : 1;
+          const playedAt = match.played_at ? new Date(match.played_at) : null;
+          const date = playedAt
+            ? formatDistanceToNow(playedAt, { addSuffix: true })
+            : "Recently";
+
+          return {
+            player1: first.players?.display_name ?? "Player 1",
+            player2: second.players?.display_name ?? "Player 2",
+            bey1: first.beyblades?.name ?? "Unknown Bey",
+            bey2: second.beyblades?.name ?? "Unknown Bey",
+            winner,
+            date,
+          };
+        })
+        .filter((battle): battle is RecentBattleItem => Boolean(battle));
+
+      const [matchCountResult, playerCountResult, beyCountResult] = await Promise.all([
+        supabase.from("matches").select("*", { count: "exact", head: true }),
+        supabase.from("players").select("*", { count: "exact", head: true }),
+        supabase.from("beyblades").select("*", { count: "exact", head: true }),
+      ]);
+
+      if (isMounted) {
+        setTopBeyblades(ranked);
+        setRecentBattles(recent);
+        setTotals({
+          battles: matchCountResult.count ?? 0,
+          players: playerCountResult.count ?? 0,
+          beyblades: beyCountResult.count ?? 0,
+        });
+        setIsLoading(false);
+      }
+    };
+
+    loadDashboard().catch((error) => {
+      console.error("Failed to load dashboard:", error);
+      if (isMounted) {
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -34,8 +197,8 @@ export default function Index() {
             Your <span className="text-gradient-primary">Beyblade</span> Battle Log
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl mx-auto mb-8">
-            Keep track of battles, stats, and collections for your local league. 
-            Perfect for family tournaments and friendly competitions.
+            Keep track of battles, stats, and collections for your local league.
+            Perfect for family matches and friendly competitions.
           </p>
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -60,21 +223,21 @@ export default function Index() {
               <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3">
                 <Swords className="w-6 h-6 text-primary" />
               </div>
-              <p className="text-3xl font-display font-bold text-foreground">36</p>
+              <p className="text-3xl font-display font-bold text-foreground">{totals.battles}</p>
               <p className="text-sm text-muted-foreground">Total Battles</p>
             </div>
             <div className="text-center p-6 rounded-xl bg-gradient-card border border-border">
               <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center mx-auto mb-3">
                 <Users className="w-6 h-6 text-accent" />
               </div>
-              <p className="text-3xl font-display font-bold text-foreground">4</p>
+              <p className="text-3xl font-display font-bold text-foreground">{totals.players}</p>
               <p className="text-sm text-muted-foreground">Bladers</p>
             </div>
             <div className="text-center p-6 rounded-xl bg-gradient-card border border-border">
               <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3">
                 <Zap className="w-6 h-6 text-primary" />
               </div>
-              <p className="text-3xl font-display font-bold text-foreground">8</p>
+              <p className="text-3xl font-display font-bold text-foreground">{totals.beyblades}</p>
               <p className="text-sm text-muted-foreground">Beyblades</p>
             </div>
           </div>
@@ -94,6 +257,9 @@ export default function Index() {
                 {topBeyblades.map((bey, i) => (
                   <BeybladeCard key={i} {...bey} />
                 ))}
+                {!isLoading && topBeyblades.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No beyblades yet.</p>
+                )}
               </div>
               <Button variant="ghost" className="w-full mt-4" asChild>
                 <Link to="/inventory">View All Beyblades →</Link>
@@ -109,6 +275,9 @@ export default function Index() {
                 {recentBattles.map((battle, i) => (
                   <RecentBattle key={i} {...battle} />
                 ))}
+                {!isLoading && recentBattles.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No battles logged yet.</p>
+                )}
               </div>
               <Button variant="ghost" className="w-full mt-4" asChild>
                 <Link to="/dashboard">View All Battles →</Link>

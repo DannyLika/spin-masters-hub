@@ -1,5 +1,4 @@
 import { Swords, Trophy, Users, Zap } from "lucide-react";
-import { Button } from "./ui/button";
 
 export function HeroSection() {
   return (
@@ -32,27 +31,17 @@ export function HeroSection() {
 
         {/* Subtitle */}
         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
-          The ultimate platform to track tournaments, manage your Beyblade collection, 
-          analyze battle statistics, and climb the global rankings.
+          The ultimate platform to track battles, manage your Beyblade collection,
+          analyze stats, and build your league history.
         </p>
 
-        {/* CTA Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-          <Button variant="hero" size="xl">
-            <Swords className="w-5 h-5 mr-2" />
-            Start Tracking
-          </Button>
-          <Button variant="outline" size="xl">
-            <Trophy className="w-5 h-5 mr-2" />
-            Browse Tournaments
-          </Button>
-        </div>
+        {/* CTA Buttons (hidden for now) */}
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
           <StatItem icon={Users} value="10,000+" label="Bladers" />
           <StatItem icon={Swords} value="50,000+" label="Battles Tracked" />
-          <StatItem icon={Trophy} value="500+" label="Tournaments" />
+          <StatItem icon={Trophy} value="500+" label="Milestones" />
           <StatItem value="99%" label="Uptime" icon={Zap} />
         </div>
       </div>

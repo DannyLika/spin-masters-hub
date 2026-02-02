@@ -1,31 +1,619 @@
+import { useEffect, useMemo, useState } from "react";
+import { formatDistanceToNow } from "date-fns";
 import { Navbar } from "@/components/Navbar";
 import { StatsCard } from "@/components/StatsCard";
-import { BeybladeCard } from "@/components/BeybladeCard";
 import { RecentBattle } from "@/components/RecentBattle";
-import { Trophy, Swords, Target, TrendingUp, Calendar, Award } from "lucide-react";
+import { Trophy, Swords, Target, TrendingUp, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 
-const userBeyblades = [
-  { name: "Valkyrie Wing", type: "Attack" as const, attack: 85, defense: 45, stamina: 60, wins: 127, losses: 43 },
-  { name: "Longinus Destroy", type: "Attack" as const, attack: 92, defense: 38, stamina: 55, wins: 98, losses: 52 },
-  { name: "Spriggan Requiem", type: "Balance" as const, attack: 75, defense: 70, stamina: 75, wins: 156, losses: 44 },
-  { name: "Fafnir Phoenix", type: "Stamina" as const, attack: 50, defense: 65, stamina: 95, wins: 89, losses: 31 },
-];
+type PlayerRow = {
+  id: string;
+  display_name: string;
+};
 
-const recentBattles = [
-  { player1: "You", player2: "SpinKing99", bey1: "Valkyrie Wing", bey2: "Longinus", winner: 1 as const, date: "2 hours ago", tournament: "Regional Showdown" },
-  { player1: "You", player2: "NovaSpin", bey1: "Spriggan", bey2: "Achilles", winner: 1 as const, date: "3 hours ago" },
-  { player1: "BeyBlade_Pro", player2: "You", bey1: "Fafnir", bey2: "Valkyrie", winner: 1 as const, date: "5 hours ago" },
-  { player1: "You", player2: "PhoenixRise", bey1: "Longinus", bey2: "Valkyrie", winner: 2 as const, date: "1 day ago" },
-];
+type InventoryOption = {
+  id: string;
+  beyblade_id: string;
+  name: string;
+};
 
-const upcomingTournaments = [
-  { name: "Weekly Showdown #48", date: "Tomorrow, 7PM", registered: true },
-  { name: "Regional Championship", date: "March 15, 2024", registered: false },
-  { name: "Community Cup #49", date: "March 20, 2024", registered: true },
-];
+type MatchParticipantRow = {
+  is_winner: boolean;
+  players: { display_name: string } | null;
+  beyblades: { name: string } | null;
+};
+
+type MatchRow = {
+  id: string;
+  played_at: string | null;
+  match_participants: MatchParticipantRow[] | null;
+};
+
+type RecentBattleItem = {
+  player1: string;
+  player2: string;
+  bey1: string;
+  bey2: string;
+  winner: 1 | 2;
+  date: string;
+};
 
 export default function Dashboard() {
+  const [players, setPlayers] = useState<PlayerRow[]>([]);
+  const [inventoryOptions, setInventoryOptions] = useState<Record<string, InventoryOption[]>>({});
+  const [recentBattles, setRecentBattles] = useState<RecentBattleItem[]>([]);
+  const [totals, setTotals] = useState({ battles: 0, players: 0, beyblades: 0 });
+  const [isLoading, setIsLoading] = useState(true);
+  const [mode, setMode] = useState<"single" | "csv">("single");
+  const [csvSummary, setCsvSummary] = useState<string>("");
+  const [playerAId, setPlayerAId] = useState("");
+  const [playerBId, setPlayerBId] = useState("");
+  const [beyAId, setBeyAId] = useState("");
+  const [beyBId, setBeyBId] = useState("");
+  const [winner, setWinner] = useState<"A" | "B">("A");
+  const [scoreA, setScoreA] = useState("1");
+  const [scoreB, setScoreB] = useState("0");
+  const [burstCount, setBurstCount] = useState("0");
+  const [knockoutCount, setKnockoutCount] = useState("0");
+  const [extremeKnockoutCount, setExtremeKnockoutCount] = useState("0");
+  const [spinFinishCount, setSpinFinishCount] = useState("0");
+  const [location, setLocation] = useState("");
+
+  const inventoryForPlayerA = useMemo(
+    () => inventoryOptions[playerAId] ?? [],
+    [inventoryOptions, playerAId]
+  );
+  const inventoryForPlayerB = useMemo(
+    () => inventoryOptions[playerBId] ?? [],
+    [inventoryOptions, playerBId]
+  );
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setIsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadDashboard = async () => {
+      setIsLoading(true);
+
+      const [
+        { data: playerData, error: playerError },
+        { data: inventoryData, error: inventoryError },
+        { data: matchData, error: matchError },
+        matchCountResult,
+        playerCountResult,
+        beyCountResult,
+      ] = await Promise.all([
+        supabase.from("players").select("id, display_name").order("display_name", { ascending: true }),
+        supabase
+          .from("player_beyblades")
+          .select("id, player_id, beyblade_id, beyblades(name)")
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("matches")
+          .select("id, played_at, match_participants(is_winner, players(display_name), beyblades(name))")
+          .order("played_at", { ascending: false })
+          .limit(5),
+        supabase.from("matches").select("*", { count: "exact", head: true }),
+        supabase.from("players").select("*", { count: "exact", head: true }),
+        supabase.from("beyblades").select("*", { count: "exact", head: true }),
+      ]);
+
+      if (playerError) {
+        console.error("Failed to load players:", playerError);
+      }
+
+      if (inventoryError) {
+        console.error("Failed to load inventory:", inventoryError);
+      }
+
+      if (matchError) {
+        console.error("Failed to load matches:", matchError);
+      }
+
+      const inventoryMap: Record<string, InventoryOption[]> = {};
+      (inventoryData ?? []).forEach((entry) => {
+        const name = entry.beyblades?.name ?? "Unknown Bey";
+        if (!inventoryMap[entry.player_id]) {
+          inventoryMap[entry.player_id] = [];
+        }
+        inventoryMap[entry.player_id].push({
+          id: entry.id,
+          beyblade_id: entry.beyblade_id,
+          name,
+        });
+      });
+
+      const recent = (matchData ?? [])
+        .map((match): RecentBattleItem | null => {
+          const participants = match.match_participants ?? [];
+          if (participants.length < 2) return null;
+
+          const [first, second] = participants;
+          const winnerIndex: 1 | 2 = first.is_winner ? 1 : second.is_winner ? 2 : 1;
+          const playedAt = match.played_at ? new Date(match.played_at) : null;
+          const date = playedAt
+            ? formatDistanceToNow(playedAt, { addSuffix: true })
+            : "Recently";
+
+          return {
+            player1: first.players?.display_name ?? "Player 1",
+            player2: second.players?.display_name ?? "Player 2",
+            bey1: first.beyblades?.name ?? "Unknown Bey",
+            bey2: second.beyblades?.name ?? "Unknown Bey",
+            winner: winnerIndex,
+            date,
+          };
+        })
+        .filter((battle): battle is RecentBattleItem => Boolean(battle));
+
+      if (isMounted) {
+        setPlayers(playerData ?? []);
+        setInventoryOptions(inventoryMap);
+        setRecentBattles(recent);
+        setTotals({
+          battles: matchCountResult.count ?? 0,
+          players: playerCountResult.count ?? 0,
+          beyblades: beyCountResult.count ?? 0,
+        });
+        setIsLoading(false);
+      }
+    };
+
+    loadDashboard().catch((error) => {
+      console.error("Failed to load dashboard:", error);
+      if (isMounted) {
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (playerAId && playerBId && playerAId === playerBId) {
+      setPlayerBId("");
+      setBeyBId("");
+    }
+  }, [playerAId, playerBId]);
+
+  const createMatch = async ({
+    winnerId,
+    scoreAValue,
+    scoreBValue,
+    eventCounts,
+  }: {
+    winnerId: string;
+    scoreAValue: number;
+    scoreBValue: number;
+    eventCounts?: { burst: number; knockout: number; extreme_knockout: number; spin_finish: number };
+  }) => {
+    const { data: matchData, error: matchError } = await supabase
+      .from("matches")
+      .insert({
+        played_at: new Date().toISOString(),
+        location: location || null,
+        format: mode === "batch" ? "best_of" : "single",
+        winner_player_id: winnerId,
+      })
+      .select("id")
+      .single();
+
+    if (matchError || !matchData) {
+      throw matchError ?? new Error("Failed to create match");
+    }
+
+    const participants = [
+      {
+        match_id: matchData.id,
+        player_id: playerAId,
+        beyblade_id: beyAId,
+        score: scoreAValue,
+        is_winner: winnerId === playerAId,
+      },
+      {
+        match_id: matchData.id,
+        player_id: playerBId,
+        beyblade_id: beyBId,
+        score: scoreBValue,
+        is_winner: winnerId === playerBId,
+      },
+    ];
+
+    const { error: participantError } = await supabase
+      .from("match_participants")
+      .insert(participants);
+
+    if (participantError) {
+      throw participantError;
+    }
+
+    if (eventCounts) {
+      const eventRows = Object.entries(eventCounts)
+        .filter(([, count]) => count > 0)
+        .map(([event_type, count]) => ({
+          match_id: matchData.id,
+          event_type,
+          count,
+        }));
+
+      if (eventRows.length > 0) {
+        const { error: eventError } = await supabase.from("match_events").insert(eventRows);
+        if (eventError) {
+          throw eventError;
+        }
+      }
+    }
+  };
+
+  const handleLogBattle = async () => {
+    if (!isSupabaseConfigured) return;
+    if (!playerAId || !playerBId || !beyAId || !beyBId) {
+      window.alert("Select two bladers and their Beyblades.");
+      return;
+    }
+
+    const scoreAValue = Number(scoreA);
+    const scoreBValue = Number(scoreB);
+    const burst = Number(burstCount);
+    const knockout = Number(knockoutCount);
+    const extremeKnockout = Number(extremeKnockoutCount);
+    const spinFinish = Number(spinFinishCount);
+    const winnerId = winner === "A" ? playerAId : playerBId;
+
+    try {
+      await createMatch({
+        winnerId,
+        scoreAValue: Number.isFinite(scoreAValue) ? scoreAValue : 0,
+        scoreBValue: Number.isFinite(scoreBValue) ? scoreBValue : 0,
+        eventCounts: {
+          burst: Number.isFinite(burst) ? burst : 0,
+          knockout: Number.isFinite(knockout) ? knockout : 0,
+          extreme_knockout: Number.isFinite(extremeKnockout) ? extremeKnockout : 0,
+          spin_finish: Number.isFinite(spinFinish) ? spinFinish : 0,
+        },
+      });
+
+      window.alert("Battle logged!");
+      setLocation("");
+    } catch (error) {
+      console.error("Failed to log battle:", error);
+      window.alert("Could not log the battle. Check your inputs and try again.");
+    }
+  };
+
+  const logCsvRow = async (row: {
+    matchId: string;
+    playerAId: string;
+    playerBId: string;
+    beyAId: string;
+    beyBId: string;
+    winner: "A" | "B";
+    scoreA: string;
+    scoreB: string;
+    date: string;
+    bursts: string;
+    knockouts: string;
+    extremeKnockouts: string;
+    spinFinishes: string;
+  }) => {
+    if (!row.matchId || !row.playerAId || !row.playerBId || !row.beyAId || !row.beyBId) {
+      return { success: false, error: "Missing required fields" };
+    }
+
+    const winnerId = row.winner === "A" ? row.playerAId : row.playerBId;
+    const scoreAValue = Number(row.scoreA);
+    const scoreBValue = Number(row.scoreB);
+    if (!Number.isFinite(scoreAValue) || !Number.isFinite(scoreBValue)) {
+      return { success: false, error: "Invalid scores" };
+    }
+
+    // Parse date - handle M/D/YYYY format
+    let playedAt: Date;
+    if (row.date) {
+      const dateMatch = row.date.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (dateMatch) {
+        const [, month, day, year] = dateMatch;
+        playedAt = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      } else {
+        playedAt = new Date(row.date);
+      }
+    } else {
+      playedAt = new Date();
+    }
+    const { data: matchData, error: matchError } = await supabase
+      .from("matches")
+      .upsert(
+        {
+          external_id: row.matchId,
+          played_at: Number.isNaN(playedAt.getTime()) ? new Date().toISOString() : playedAt.toISOString(),
+          location: location || null,
+          format: "best_of",
+          winner_player_id: winnerId,
+        },
+        { onConflict: "external_id", ignoreDuplicates: true }
+      )
+      .select("id")
+      .maybeSingle();
+
+    if (matchError || !matchData) {
+      return { success: false, error: matchError?.message ?? "Failed to create match" };
+    }
+
+    const participants = [
+      {
+        match_id: matchData.id,
+        player_id: row.playerAId,
+        beyblade_id: row.beyAId,
+        score: scoreAValue,
+        is_winner: winnerId === row.playerAId,
+      },
+      {
+        match_id: matchData.id,
+        player_id: row.playerBId,
+        beyblade_id: row.beyBId,
+        score: scoreBValue,
+        is_winner: winnerId === row.playerBId,
+      },
+    ];
+
+    const { error: participantError } = await supabase.from("match_participants").insert(participants);
+    if (participantError) {
+      return { success: false, error: participantError.message };
+    }
+
+    const bursts = Number(row.bursts);
+    const knockouts = Number(row.knockouts);
+    const extremeKnockouts = Number(row.extremeKnockouts);
+    const spinFinishes = Number(row.spinFinishes);
+    const eventRows = [
+      { event_type: "burst", count: Number.isFinite(bursts) ? bursts : 0 },
+      { event_type: "knockout", count: Number.isFinite(knockouts) ? knockouts : 0 },
+      { event_type: "extreme_knockout", count: Number.isFinite(extremeKnockouts) ? extremeKnockouts : 0 },
+      { event_type: "spin_finish", count: Number.isFinite(spinFinishes) ? spinFinishes : 0 },
+    ]
+      .filter((event) => event.count > 0)
+      .map((event) => ({
+        match_id: matchData.id,
+        event_type: event.event_type,
+        count: event.count,
+      }));
+
+    if (eventRows.length > 0) {
+      const { error: eventError } = await supabase.from("match_events").insert(eventRows);
+      if (eventError) {
+        return { success: false, error: eventError.message };
+      }
+    }
+
+    return { success: true };
+  };
+
+  const parseBatchCsv = (content: string): {
+    rows: {
+      id: string;
+      matchId: string;
+      playerAName: string;
+      playerBName: string;
+      playerAId: string;
+      playerBId: string;
+      winner: "A" | "B";
+      scoreA: string;
+      scoreB: string;
+      beyAId: string;
+      beyBId: string;
+      beyAName: string;
+      beyBName: string;
+      date: string;
+      bursts: string;
+      knockouts: string;
+      extremeKnockouts: string;
+      spinFinishes: string;
+    }[];
+    warnings: string[];
+  } => {
+    const lines = content
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    if (lines.length === 0) {
+      return { rows: [], warnings: [] };
+    }
+
+    const headerCells = lines[0].split(",").map((cell) => cell.trim().toLowerCase());
+    const hasHeader =
+      headerCells.includes("match_id") ||
+      headerCells.includes("player1") ||
+      headerCells.includes("player2") ||
+      headerCells.includes("player1_bey") ||
+      headerCells.includes("player2_bey") ||
+      headerCells.includes("winner") ||
+      headerCells.includes("scorea") ||
+      headerCells.includes("scoreb") ||
+      headerCells.includes("date") ||
+      headerCells.includes("bursts") ||
+      headerCells.includes("knockouts") ||
+      headerCells.includes("extreme_knockouts") ||
+      headerCells.includes("spin_finishes");
+
+    const startIndex = hasHeader ? 1 : 0;
+    const rows: {
+      id: string;
+      matchId: string;
+      playerAName: string;
+      playerBName: string;
+      playerAId: string;
+      playerBId: string;
+      winner: "A" | "B";
+      scoreA: string;
+      scoreB: string;
+      beyAId: string;
+      beyBId: string;
+      beyAName: string;
+      beyBName: string;
+      date: string;
+      bursts: string;
+      knockouts: string;
+      extremeKnockouts: string;
+      spinFinishes: string;
+    }[] = [];
+    const warnings: string[] = [];
+
+    for (let i = startIndex; i < lines.length; i += 1) {
+      const cells = lines[i].split(",").map((cell) => cell.trim());
+      if (cells.length < 8) {
+        warnings.push(`Row ${i + 1}: Skipped (not enough columns)`);
+        continue;
+      }
+      const [
+        matchIdRaw,
+        playerARaw,
+        beyARaw,
+        scoreARaw,
+        playerBRaw,
+        beyBRaw,
+        scoreBRaw,
+        winnerRaw,
+        dateRaw = "",
+        burstsRaw = "0",
+        knockoutsRaw = "0",
+        extremeKnockoutsRaw = "0",
+        spinFinishesRaw = "0",
+      ] = cells;
+      const playerAId =
+        players.find((player) => player.display_name.toLowerCase() === playerARaw.toLowerCase())
+          ?.id ?? "";
+      const playerBId =
+        players.find((player) => player.display_name.toLowerCase() === playerBRaw.toLowerCase())
+          ?.id ?? "";
+      // Winner can be "A", "B", or a player name - match to player1 or player2
+      const winnerUpper = winnerRaw.toUpperCase();
+      const winnerMatchesA = winnerUpper === "A" || winnerRaw.toLowerCase() === playerARaw.toLowerCase();
+      const winnerMatchesB = winnerUpper === "B" || winnerRaw.toLowerCase() === playerBRaw.toLowerCase();
+      const winner = winnerMatchesB ? "B" : winnerMatchesA ? "A" : "A"; // default to A if unclear
+      
+      if (!winnerMatchesA && !winnerMatchesB && winnerRaw) {
+        warnings.push(`Row ${i + 1}: Winner "${winnerRaw}" doesn't match player1 or player2, defaulting to player1`);
+      }
+      const beyAIdFromName =
+        (inventoryOptions[playerAId] ?? []).find(
+          (bey) => bey.name.toLowerCase() === beyARaw.toLowerCase()
+        )?.beyblade_id ?? "";
+      const beyBIdFromName =
+        (inventoryOptions[playerBId] ?? []).find(
+          (bey) => bey.name.toLowerCase() === beyBRaw.toLowerCase()
+        )?.beyblade_id ?? "";
+
+      if (!playerAId) {
+        warnings.push(`Row ${i + 1}: Player "${playerARaw}" not found`);
+      }
+      if (!playerBId) {
+        warnings.push(`Row ${i + 1}: Player "${playerBRaw}" not found`);
+      }
+      if (!beyAIdFromName) {
+        warnings.push(`Row ${i + 1}: Bey "${beyARaw}" not found for ${playerARaw}`);
+      }
+      if (!beyBIdFromName) {
+        warnings.push(`Row ${i + 1}: Bey "${beyBRaw}" not found for ${playerBRaw}`);
+      }
+
+      rows.push({
+        id: `row-${i - startIndex + 1}`,
+        matchId: matchIdRaw,
+        playerAName: playerARaw,
+        playerBName: playerBRaw,
+        playerAId,
+        playerBId,
+        winner,
+        scoreA: scoreARaw || "1",
+        scoreB: scoreBRaw || "0",
+        beyAId: beyAIdFromName,
+        beyBId: beyBIdFromName,
+        beyAName: beyARaw,
+        beyBName: beyBRaw,
+        date: dateRaw,
+        bursts: burstsRaw || "0",
+        knockouts: knockoutsRaw || "0",
+        extremeKnockouts: extremeKnockoutsRaw || "0",
+        spinFinishes: spinFinishesRaw || "0",
+      });
+    }
+
+    return { rows, warnings };
+  };
+
+  const handleBatchImport = async () => {
+    if (!isSupabaseConfigured) {
+      window.alert("Supabase is not configured.");
+      return;
+    }
+
+    setCsvSummary("Loading and processing CSV...");
+    try {
+      const response = await fetch(`/batch-import.csv?ts=${Date.now()}`);
+      if (!response.ok) {
+        setCsvSummary("Error: Could not load batch-import.csv from the server.");
+        return;
+      }
+
+      const text = await response.text();
+      const { rows: parsed, warnings } = parseBatchCsv(text);
+      if (parsed.length === 0) {
+        setCsvSummary("No valid rows found in the import file.");
+        return;
+      }
+
+      let successCount = 0;
+      let skipCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+      const existingMatchIds = new Set<string>();
+
+      for (const row of parsed) {
+        if (!row.matchId) {
+          errorCount++;
+          errors.push(`Row ${row.id}: Missing match_id`);
+          continue;
+        }
+        if (existingMatchIds.has(row.matchId)) {
+          skipCount++;
+          continue;
+        }
+        existingMatchIds.add(row.matchId);
+
+        const result = await logCsvRow(row);
+        if (result.success) {
+          successCount++;
+        } else {
+          errorCount++;
+          errors.push(`Row ${row.id} (${row.matchId}): ${result.error}`);
+        }
+      }
+
+      const summary = [
+        `CSV Import Complete`,
+        `Total rows: ${parsed.length}`,
+        `✅ Logged: ${successCount}`,
+        `⏭️  Skipped (duplicates): ${skipCount}`,
+        `❌ Errors: ${errorCount}`,
+        ...(warnings.length > 0 ? [`\nWarnings:\n${warnings.slice(0, 10).join("\n")}${warnings.length > 10 ? `\n... and ${warnings.length - 10} more` : ""}`] : []),
+        ...(errors.length > 0 ? [`\nErrors:\n${errors.slice(0, 10).join("\n")}${errors.length > 10 ? `\n... and ${errors.length - 10} more` : ""}`] : []),
+      ].join("\n");
+
+      setCsvSummary(summary);
+    } catch (error) {
+      console.error("Failed to import CSV:", error);
+      setCsvSummary(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -35,59 +623,240 @@ export default function Dashboard() {
           {/* Header */}
           <div className="mb-8">
             <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-2">
-              Welcome back, <span className="text-gradient-primary">DragonMaster</span>
+              Battle <span className="text-gradient-primary">Dashboard</span>
             </h1>
-            <p className="text-muted-foreground">Here's your battle overview</p>
+            <p className="text-muted-foreground">
+              Select bladers, log battles, and track your inventory
+            </p>
           </div>
 
           {/* Stats Grid */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
             <StatsCard
               title="Total Battles"
-              value="470"
-              subtitle="This month"
-              icon={Swords}
-              trend={{ value: 12, isPositive: true }}
-            />
-            <StatsCard
-              title="Win Rate"
-              value="74.2%"
-              subtitle="Last 100 battles"
-              icon={Target}
-              trend={{ value: 5, isPositive: true }}
-            />
-            <StatsCard
-              title="Tournaments Won"
-              value="12"
+              value={totals.battles}
               subtitle="All time"
+              icon={Swords}
+            />
+            <StatsCard
+              title="Bladers"
+              value={totals.players}
+              subtitle="Registered"
+              icon={Target}
+            />
+            <StatsCard
+              title="Beyblades"
+              value={totals.beyblades}
+              subtitle="In catalog"
               icon={Trophy}
             />
             <StatsCard
-              title="Global Rank"
-              value="#142"
-              subtitle="↑ 28 positions"
+              title="Status"
+              value={isLoading ? "Loading..." : "Ready"}
+              subtitle="Supabase"
               icon={TrendingUp}
-              trend={{ value: 28, isPositive: true }}
             />
           </div>
 
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-8">
-              {/* My Beyblades */}
+              {/* Battle Logger */}
               <section>
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="font-display text-2xl font-bold text-foreground">
-                    My <span className="text-gradient-accent">Beyblades</span>
+                    Log <span className="text-gradient-accent">Battles</span>
                   </h2>
-                  <Button variant="outline" size="sm">
-                    Add New
-                  </Button>
                 </div>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {userBeyblades.map((bey, i) => (
-                    <BeybladeCard key={i} {...bey} />
-                  ))}
+                <div className="rounded-xl bg-gradient-card border border-border p-6 space-y-4">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex-1">
+                      <label className="text-xs text-muted-foreground mb-1 block">Mode</label>
+                      <select
+                        value={mode}
+                        onChange={(event) => {
+                          setMode(event.target.value as "single" | "csv");
+                          setCsvSummary("");
+                        }}
+                        className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
+                      >
+                        <option value="single">Single battle</option>
+                        <option value="csv">CSV upload</option>
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-xs text-muted-foreground mb-1 block">Location</label>
+                      <input
+                        value={location}
+                        onChange={(event) => setLocation(event.target.value)}
+                        className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
+                        placeholder="Living room arena"
+                      />
+                    </div>
+                  </div>
+
+                  {mode === "single" && (
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs text-muted-foreground block">Blader A</label>
+                        <select
+                          value={playerAId}
+                          onChange={(event) => {
+                            setPlayerAId(event.target.value);
+                            setBeyAId("");
+                          }}
+                          className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
+                        >
+                          <option value="">Choose blader...</option>
+                          {players.map((player) => (
+                            <option key={player.id} value={player.id}>
+                              {player.display_name}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={beyAId}
+                          onChange={(event) => setBeyAId(event.target.value)}
+                          className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
+                        >
+                          <option value="">Choose Beyblade...</option>
+                          {inventoryForPlayerA.map((bey) => (
+                            <option key={bey.beyblade_id} value={bey.beyblade_id}>
+                              {bey.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs text-muted-foreground block">Blader B</label>
+                        <select
+                          value={playerBId}
+                          onChange={(event) => {
+                            setPlayerBId(event.target.value);
+                            setBeyBId("");
+                          }}
+                          className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
+                        >
+                          <option value="">Choose blader...</option>
+                          {players.map((player) => (
+                            <option key={player.id} value={player.id}>
+                              {player.display_name}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={beyBId}
+                          onChange={(event) => setBeyBId(event.target.value)}
+                          className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
+                        >
+                          <option value="">Choose Beyblade...</option>
+                          {inventoryForPlayerB.map((bey) => (
+                            <option key={bey.beyblade_id} value={bey.beyblade_id}>
+                              {bey.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {mode === "single" ? (
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs text-muted-foreground block">Winner</label>
+                        <select
+                          value={winner}
+                          onChange={(event) => setWinner(event.target.value as "A" | "B")}
+                          className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
+                        >
+                          <option value="A">Blader A</option>
+                          <option value="B">Blader B</option>
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-muted-foreground block">Score A</label>
+                          <input
+                            value={scoreA}
+                            onChange={(event) => setScoreA(event.target.value)}
+                            className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground block">Score B</label>
+                          <input
+                            value={scoreB}
+                            onChange={(event) => setScoreB(event.target.value)}
+                            className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 md:col-span-2">
+                        <div>
+                          <label className="text-xs text-muted-foreground block">Bursts</label>
+                          <input
+                            value={burstCount}
+                            onChange={(event) => setBurstCount(event.target.value)}
+                            className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground block">Knockouts</label>
+                          <input
+                            value={knockoutCount}
+                            onChange={(event) => setKnockoutCount(event.target.value)}
+                            className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground block">Extreme KO</label>
+                          <input
+                            value={extremeKnockoutCount}
+                            onChange={(event) => setExtremeKnockoutCount(event.target.value)}
+                            className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground block">Spin Finishes</label>
+                          <input
+                            value={spinFinishCount}
+                            onChange={(event) => setSpinFinishCount(event.target.value)}
+                            className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
+                          />
+                        </div>
+                      </div>
+                      <Button variant="default" className="md:col-span-2" onClick={handleLogBattle}>
+                        Log Battle
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="rounded-lg border border-dashed border-border p-6 space-y-4">
+                        <div>
+                          <h3 className="text-sm font-medium mb-2">CSV Import</h3>
+                          <p className="text-xs text-muted-foreground mb-4">
+                            Import battles from <code className="px-1 py-0.5 bg-secondary rounded">batch-import.csv</code>.
+                            The file should have these columns:
+                          </p>
+                          <p className="text-xs font-mono text-muted-foreground mb-4">
+                            match_id, player1, player1_bey, player1_score, player2, player2_bey,
+                            player2_score, winner, date, bursts, knockouts, extreme_knockouts,
+                            spin_finishes
+                          </p>
+                          <Button variant="default" onClick={handleBatchImport}>
+                            Import and Log CSV
+                          </Button>
+                        </div>
+                        {csvSummary && (
+                          <div className="mt-4 p-4 rounded-lg bg-secondary border border-border">
+                            <pre className="text-xs font-mono whitespace-pre-wrap text-foreground">
+                              {csvSummary}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </section>
 
@@ -105,6 +874,9 @@ export default function Dashboard() {
                   {recentBattles.map((battle, i) => (
                     <RecentBattle key={i} {...battle} />
                   ))}
+                  {!isLoading && recentBattles.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No battles logged yet.</p>
+                  )}
                 </div>
               </section>
             </div>
@@ -119,41 +891,10 @@ export default function Dashboard() {
                     <Swords className="w-4 h-4 mr-2" />
                     Log New Battle
                   </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    <Trophy className="w-4 h-4 mr-2" />
-                    Find Tournament
-                  </Button>
                   <Button variant="ghost" className="w-full justify-start">
                     <Award className="w-4 h-4 mr-2" />
                     View Achievements
                   </Button>
-                </div>
-              </div>
-
-              {/* Upcoming Tournaments */}
-              <div className="rounded-xl bg-gradient-card border border-border p-6">
-                <h3 className="font-display text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-primary" />
-                  Upcoming
-                </h3>
-                <div className="space-y-4">
-                  {upcomingTournaments.map((t, i) => (
-                    <div key={i} className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{t.name}</p>
-                        <p className="text-xs text-muted-foreground">{t.date}</p>
-                      </div>
-                      {t.registered ? (
-                        <span className="text-xs font-medium text-green-400 bg-green-400/20 px-2 py-1 rounded">
-                          Registered
-                        </span>
-                      ) : (
-                        <Button variant="outline" size="sm">
-                          Join
-                        </Button>
-                      )}
-                    </div>
-                  ))}
                 </div>
               </div>
 

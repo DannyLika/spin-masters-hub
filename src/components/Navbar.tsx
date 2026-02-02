@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Swords, LayoutDashboard, Package, BookOpen } from "lucide-react";
+import { Menu, X, Swords, LayoutDashboard, Package, BookOpen, BarChart3 } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 
@@ -8,6 +8,7 @@ const navItems = [
   { href: "/", label: "Home", icon: Swords },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/inventory", label: "Inventory", icon: Package },
+  { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/rules", label: "Rules", icon: BookOpen },
 ];
 
@@ -48,15 +49,7 @@ export function Navbar() {
             ))}
           </div>
 
-          {/* CTA */}
-          <div className="hidden md:flex items-center gap-3">
-            <Button variant="outline" size="sm">
-              Sign In
-            </Button>
-            <Button variant="default" size="sm">
-              Get Started
-            </Button>
-          </div>
+          {/* CTA (hidden for now) */}
 
           {/* Mobile Menu Button */}
           <button
@@ -87,14 +80,6 @@ export function Navbar() {
                   {item.label}
                 </Link>
               ))}
-              <div className="flex gap-2 mt-4 px-4">
-                <Button variant="outline" size="sm" className="flex-1">
-                  Sign In
-                </Button>
-                <Button variant="default" size="sm" className="flex-1">
-                  Get Started
-                </Button>
-              </div>
             </div>
           </div>
         )}
