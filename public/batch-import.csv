@@ -1,3 +1,4 @@
 match_id,player1,player1_bey,player1_score,player2,player2_bey,player2_score,winner,date,bursts,knockouts,extreme_knockouts,spin_finishes
-match-001,Stevo,DranSword 3-60F,1,Maximo,WizardArrow 4-80B,0,Stevo,2/2/2026,1,0,0,0
-match-002,Stevo,DranSword 3-60F,0,Maximo,WizardArrow 4-80B,1,Maximo,2/2/2026,0,1,0,0
+match-001,Stevan,Sword Dran 3-60F,0,Max,Gale Wyvern 5-80GB,1,Max,2/3/2026,0,1,0,0
+match-002,Stevan,DranSword 3-60F,0,Max,Gale Wyvern 5-80GB,1,Max,2/3/2026,0,0,0,1
+match-003,Stevan,Sword Dran 3-60F,0,Max,Sword Dran 3-60F,1,Max,2/3/2026,0,1,0,0

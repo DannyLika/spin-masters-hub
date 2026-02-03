@@ -586,6 +586,19 @@ export default function Dashboard() {
           skipCount++;
           continue;
         }
+        
+        // Skip rows with missing required data
+        if (!row.playerAId || !row.playerBId) {
+          errorCount++;
+          errors.push(`Row ${row.id} (${row.matchId}): Missing players - "${row.playerAName}" or "${row.playerBName}" not found in database`);
+          continue;
+        }
+        if (!row.beyAId || !row.beyBId) {
+          errorCount++;
+          errors.push(`Row ${row.id} (${row.matchId}): Missing Beyblades - "${row.beyAName}" or "${row.beyBName}" not found in player inventories`);
+          continue;
+        }
+        
         existingMatchIds.add(row.matchId);
 
         const result = await logCsvRow(row);
