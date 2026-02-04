@@ -86,7 +86,6 @@ export default function Dashboard() {
         { data: matchData, error: matchError },
         matchCountResult,
         playerCountResult,
-        beyCountResult,
       ] = await Promise.all([
         supabase.from("players").select("id, display_name").order("display_name", { ascending: true }),
         supabase
@@ -100,7 +99,6 @@ export default function Dashboard() {
           .limit(5),
         supabase.from("matches").select("*", { count: "exact", head: true }),
         supabase.from("players").select("*", { count: "exact", head: true }),
-        supabase.from("beyblades").select("*", { count: "exact", head: true }),
       ]);
 
       if (playerError) {
@@ -158,7 +156,7 @@ export default function Dashboard() {
         setTotals({
           battles: matchCountResult.count ?? 0,
           players: playerCountResult.count ?? 0,
-          beyblades: beyCountResult.count ?? 0,
+          beyblades: 0,
         });
         setIsLoading(false);
       }
@@ -714,7 +712,7 @@ export default function Dashboard() {
           </div>
 
           {/* Stats Grid */}
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
             <StatsCard
               title="Total Battles"
               value={totals.battles}
@@ -726,12 +724,6 @@ export default function Dashboard() {
               value={totals.players}
               subtitle="Registered"
               icon={Target}
-            />
-            <StatsCard
-              title="Beyblades"
-              value={totals.beyblades}
-              subtitle="In catalog"
-              icon={Trophy}
             />
             <StatsCard
               title="Status"
