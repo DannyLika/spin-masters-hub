@@ -151,10 +151,9 @@ export default function Index() {
         })
         .filter((battle): battle is RecentBattleItem => Boolean(battle));
 
-      const [matchCountResult, playerCountResult, beyCountResult] = await Promise.all([
+      const [matchCountResult, playerCountResult] = await Promise.all([
         supabase.from("matches").select("*", { count: "exact", head: true }),
         supabase.from("players").select("*", { count: "exact", head: true }),
-        supabase.from("beyblades").select("*", { count: "exact", head: true }),
       ]);
 
       if (isMounted) {
@@ -163,7 +162,7 @@ export default function Index() {
         setTotals({
           battles: matchCountResult.count ?? 0,
           players: playerCountResult.count ?? 0,
-          beyblades: beyCountResult.count ?? 0,
+          beyblades: 0,
         });
         setIsLoading(false);
       }
@@ -218,7 +217,7 @@ export default function Index() {
       {/* Quick Stats */}
       <section className="py-12 px-4">
         <div className="container mx-auto">
-          <div className="grid sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
+          <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
             <div className="text-center p-6 rounded-xl bg-gradient-card border border-border">
               <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3">
                 <Swords className="w-6 h-6 text-primary" />
@@ -232,13 +231,6 @@ export default function Index() {
               </div>
               <p className="text-3xl font-display font-bold text-foreground">{totals.players}</p>
               <p className="text-sm text-muted-foreground">Bladers</p>
-            </div>
-            <div className="text-center p-6 rounded-xl bg-gradient-card border border-border">
-              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3">
-                <Zap className="w-6 h-6 text-primary" />
-              </div>
-              <p className="text-3xl font-display font-bold text-foreground">{totals.beyblades}</p>
-              <p className="text-sm text-muted-foreground">Beyblades</p>
             </div>
           </div>
         </div>
