@@ -548,19 +548,24 @@ export default function Dashboard() {
       if (!winnerMatchesA && !winnerMatchesB && winnerRaw) {
         warnings.push(`Row ${i + 1}: Winner "${winnerRaw}" doesn't match player1 or player2, defaulting to player1`);
       }
+      // Normalize dash characters (hyphen, en-dash, em-dash) to regular hyphen for comparison
+      const normalizeDashes = (str: string) => {
+        return str.replace(/[\u2013\u2014\u2015]/g, '-'); // Replace en-dash, em-dash, horizontal bar with hyphen
+      };
+      
       const beyAIdFromName =
         (inventoryOptions[playerAId] ?? []).find(
           (bey) => {
-            const beyName = bey.name.toLowerCase().trim();
-            const csvName = beyARaw.toLowerCase().trim();
+            const beyName = normalizeDashes(bey.name.toLowerCase().trim());
+            const csvName = normalizeDashes(beyARaw.toLowerCase().trim());
             return beyName === csvName;
           }
         )?.beyblade_id ?? "";
       const beyBIdFromName =
         (inventoryOptions[playerBId] ?? []).find(
           (bey) => {
-            const beyName = bey.name.toLowerCase().trim();
-            const csvName = beyBRaw.toLowerCase().trim();
+            const beyName = normalizeDashes(bey.name.toLowerCase().trim());
+            const csvName = normalizeDashes(beyBRaw.toLowerCase().trim());
             return beyName === csvName;
           }
         )?.beyblade_id ?? "";
