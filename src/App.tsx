@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/Inventory";
 import Rules from "./pages/Rules";
 import Reports from "./pages/Reports";
+import CsvEditor from "./pages/CsvEditor";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/rules" element={<Rules />} />
+          <Route path="/csv-editor" element={<CsvEditor />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

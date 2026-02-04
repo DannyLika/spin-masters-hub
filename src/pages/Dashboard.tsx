@@ -6,6 +6,8 @@ import { RecentBattle } from "@/components/RecentBattle";
 import { Trophy, Swords, Target, TrendingUp, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
+import { normalizeBeybladeName } from "@/lib/beybladeUtils";
+import { Link } from "react-router-dom";
 
 type PlayerRow = {
   id: string;
@@ -546,27 +548,21 @@ export default function Dashboard() {
       if (!winnerMatchesA && !winnerMatchesB && winnerRaw) {
         warnings.push(`Row ${i + 1}: Winner "${winnerRaw}" doesn't match player1 or player2, defaulting to player1`);
       }
-      // Normalize dash characters (hyphen, en-dash, em-dash) to regular hyphen for comparison
-      // Replace any character that looks like a dash with a regular hyphen
-      const normalizeDashes = (str: string) => {
-        // Match any dash-like character (including en-dash U+2013, em-dash U+2014, etc.)
-        // Use a character class that matches common dash variants
-        return str.replace(/[‐‑‒–—―−⁻₋−]/g, '-');
-      };
+      // Normalize names using the utility function
       
       const beyAIdFromName =
         (inventoryOptions[playerAId] ?? []).find(
           (bey) => {
-            const beyName = normalizeDashes(bey.name.toLowerCase().trim());
-            const csvName = normalizeDashes(beyARaw.toLowerCase().trim());
+            const beyName = normalizeBeybladeName(bey.name);
+            const csvName = normalizeBeybladeName(beyARaw);
             return beyName === csvName;
           }
         )?.beyblade_id ?? "";
       const beyBIdFromName =
         (inventoryOptions[playerBId] ?? []).find(
           (bey) => {
-            const beyName = normalizeDashes(bey.name.toLowerCase().trim());
-            const csvName = normalizeDashes(beyBRaw.toLowerCase().trim());
+            const beyName = normalizeBeybladeName(bey.name);
+            const csvName = normalizeBeybladeName(beyBRaw);
             return beyName === csvName;
           }
         )?.beyblade_id ?? "";
@@ -913,11 +909,14 @@ export default function Dashboard() {
                             Import battles from <code className="px-1 py-0.5 bg-secondary rounded">batch-import.csv</code>.
                             The file should have these columns:
                           </p>
-                          <p className="text-xs font-mono text-muted-foreground mb-4">
+                          <p className="text-xs font-mono text-muted-foreground mb-2">
                             match_id, player1, player1_bey, player1_score, player2, player2_bey,
                             player2_score, winner, date, bursts, knockouts, extreme_knockouts,
                             spin_finishes
                           </p>
+                          <Link to="/csv-editor" className="text-xs text-primary hover:underline mb-4 block">
+                            → Open CSV Editor (with autocomplete)
+                          </Link>
                           <Button variant="default" onClick={handleBatchImport}>
                             Import and Log CSV
                           </Button>
