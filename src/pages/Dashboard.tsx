@@ -617,13 +617,15 @@ export default function Dashboard() {
 
     setCsvSummary("Loading and processing CSV...");
     try {
-      const response = await fetch(`/batch-import.csv?ts=${Date.now()}`);
+      const response = await fetch(`/batch-import.csv?ts=${Date.now()}&v=${Math.random()}`);
       if (!response.ok) {
         setCsvSummary("Error: Could not load batch-import.csv from the server.");
         return;
       }
 
       const text = await response.text();
+      console.log("Raw CSV content (first 500 chars):", text.substring(0, 500));
+      console.log("CSV line count:", text.split(/\r?\n/).length);
       const { rows: parsed, warnings } = parseBatchCsv(text);
       if (parsed.length === 0) {
         setCsvSummary("No valid rows found in the import file.");
