@@ -445,11 +445,16 @@ export default function Dashboard() {
 
     // Create column index map from header
     const getColumnIndex = (name: string): number => {
-      const normalized = name.toLowerCase().replace(/_/g, "");
-      return headerCells.findIndex((h) => {
+      const searchName = name.toLowerCase();
+      const normalized = searchName.replace(/_/g, "");
+      const idx = headerCells.findIndex((h) => {
         const normalizedHeader = h.replace(/_/g, "");
-        return h === name.toLowerCase() || normalizedHeader === normalized;
+        return h === searchName || normalizedHeader === normalized;
       });
+      if (idx === -1) {
+        warnings.push(`Warning: Column "${name}" not found in CSV header. Available columns: ${headerCells.join(", ")}`);
+      }
+      return idx;
     };
 
     const matchIdIdx = hasHeader ? getColumnIndex("match_id") : 0;
@@ -496,19 +501,38 @@ export default function Dashboard() {
         continue;
       }
       
-      const matchIdRaw = cells[matchIdIdx] || "";
-      const playerARaw = cells[player1Idx] || "";
-      const beyARaw = cells[player1BeyIdx] || "";
-      const scoreARaw = cells[player1ScoreIdx] || "";
-      const playerBRaw = cells[player2Idx] || "";
-      const beyBRaw = cells[player2BeyIdx] || "";
-      const scoreBRaw = cells[player2ScoreIdx] || "";
-      const winnerRaw = cells[winnerIdx] || "";
-      const dateRaw = cells[dateIdx] || "";
-      const burstsRaw = cells[burstsIdx] || "0";
-      const knockoutsRaw = cells[knockoutsIdx] || "0";
-      const extremeKnockoutsRaw = cells[extremeKnockoutsIdx] || "0";
-      const spinFinishesRaw = cells[spinFinishesIdx] || "0";
+      // Validate column indices
+      if (hasHeader && (matchIdIdx < 0 || player1Idx < 0 || player1BeyIdx < 0 || player2Idx < 0 || player2BeyIdx < 0)) {
+        warnings.push(`Row ${i + 1}: Invalid column mapping. Header: ${lines[0]}`);
+        continue;
+      }
+      
+      const matchIdRaw = (matchIdIdx >= 0 && matchIdIdx < cells.length) ? cells[matchIdIdx] : "";
+      const playerARaw = (player1Idx >= 0 && player1Idx < cells.length) ? cells[player1Idx] : "";
+      const beyARaw = (player1BeyIdx >= 0 && player1BeyIdx < cells.length) ? cells[player1BeyIdx] : "";
+      const scoreARaw = (player1ScoreIdx >= 0 && player1ScoreIdx < cells.length) ? cells[player1ScoreIdx] : "";
+      const playerBRaw = (player2Idx >= 0 && player2Idx < cells.length) ? cells[player2Idx] : "";
+      const beyBRaw = (player2BeyIdx >= 0 && player2BeyIdx < cells.length) ? cells[player2BeyIdx] : "";
+      const scoreBRaw = (player2ScoreIdx >= 0 && player2ScoreIdx < cells.length) ? cells[player2ScoreIdx] : "";
+      const winnerRaw = (winnerIdx >= 0 && winnerIdx < cells.length) ? cells[winnerIdx] : "";
+      const dateRaw = (dateIdx >= 0 && dateIdx < cells.length) ? cells[dateIdx] : "";
+      const burstsRaw = (burstsIdx >= 0 && burstsIdx < cells.length) ? cells[burstsIdx] : "0";
+      const knockoutsRaw = (knockoutsIdx >= 0 && knockoutsIdx < cells.length) ? cells[knockoutsIdx] : "0";
+      const extremeKnockoutsRaw = (extremeKnockoutsIdx >= 0 && extremeKnockoutsIdx < cells.length) ? cells[extremeKnockoutsIdx] : "0";
+      const spinFinishesRaw = (spinFinishesIdx >= 0 && spinFinishesIdx < cells.length) ? cells[spinFinishesIdx] : "0";
+      
+      // Debug: log what we're reading
+      if (i === startIndex) {
+        console.log("CSV Parsing Debug - First row:", {
+          matchId: matchIdRaw,
+          player1: playerARaw,
+          player1Bey: beyARaw,
+          player2: playerBRaw,
+          player2Bey: beyBRaw,
+          allCells: cells,
+          indices: { matchIdIdx, player1Idx, player1BeyIdx, player2Idx, player2BeyIdx }
+        });
+      }
       const playerAId =
         players.find((player) => player.display_name.toLowerCase() === playerARaw.toLowerCase())
           ?.id ?? "";
@@ -526,11 +550,19 @@ export default function Dashboard() {
       }
       const beyAIdFromName =
         (inventoryOptions[playerAId] ?? []).find(
-          (bey) => bey.name.toLowerCase().trim() === beyARaw.toLowerCase().trim()
+          (bey) => {
+            const beyName = bey.name.toLowerCase().trim();
+            const csvName = beyARaw.toLowerCase().trim();
+            return beyName === csvName;
+          }
         )?.beyblade_id ?? "";
       const beyBIdFromName =
         (inventoryOptions[playerBId] ?? []).find(
-          (bey) => bey.name.toLowerCase().trim() === beyBRaw.toLowerCase().trim()
+          (bey) => {
+            const beyName = bey.name.toLowerCase().trim();
+            const csvName = beyBRaw.toLowerCase().trim();
+            return beyName === csvName;
+          }
         )?.beyblade_id ?? "";
 
       if (!playerAId) {
@@ -541,11 +573,15 @@ export default function Dashboard() {
       }
       if (!beyAIdFromName && playerAId) {
         const available = (inventoryOptions[playerAId] ?? []).map(b => b.name).join(", ");
-        warnings.push(`Row ${i + 1}: Bey "${beyARaw}" not found for ${playerARaw}. Available: ${available || "none"}`);
+        const csvBey = beyARaw;
+        const availableList = (inventoryOptions[playerAId] ?? []).map(b => `"${b.name}"`).join(", ");
+        warnings.push(`Row ${i + 1}: Bey "${csvBey}" not found for ${playerARaw}. Looking for: "${csvBey}" (length: ${csvBey.length}). Available: ${availableList || "none"}`);
       }
       if (!beyBIdFromName && playerBId) {
         const available = (inventoryOptions[playerBId] ?? []).map(b => b.name).join(", ");
-        warnings.push(`Row ${i + 1}: Bey "${beyBRaw}" not found for ${playerBRaw}. Available: ${available || "none"}`);
+        const csvBey = beyBRaw;
+        const availableList = (inventoryOptions[playerBId] ?? []).map(b => `"${b.name}"`).join(", ");
+        warnings.push(`Row ${i + 1}: Bey "${csvBey}" not found for ${playerBRaw}. Looking for: "${csvBey}" (length: ${csvBey.length}). Available: ${availableList || "none"}`);
       }
 
       rows.push({
