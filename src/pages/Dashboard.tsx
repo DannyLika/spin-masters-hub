@@ -550,7 +550,7 @@ export default function Dashboard() {
       }
       // Normalize dash characters (hyphen, en-dash, em-dash) to regular hyphen for comparison
       const normalizeDashes = (str: string) => {
-        return str.replace(/[\u2013\u2014\u2015]/g, '-'); // Replace en-dash, em-dash, horizontal bar with hyphen
+        return str.replace(/[\u2013\u2014\u2015\u2212]/g, '-'); // Replace en-dash, em-dash, horizontal bar, minus sign with hyphen
       };
       
       const beyAIdFromName =
@@ -558,6 +558,17 @@ export default function Dashboard() {
           (bey) => {
             const beyName = normalizeDashes(bey.name.toLowerCase().trim());
             const csvName = normalizeDashes(beyARaw.toLowerCase().trim());
+            if (i === startIndex && beyARaw) {
+              console.log("Comparing Bey A:", {
+                csvOriginal: beyARaw,
+                csvNormalized: csvName,
+                dbOriginal: bey.name,
+                dbNormalized: beyName,
+                match: beyName === csvName,
+                csvChars: Array.from(beyARaw).map(c => `${c} (${c.charCodeAt(0)})`),
+                dbChars: Array.from(bey.name).map(c => `${c} (${c.charCodeAt(0)})`)
+              });
+            }
             return beyName === csvName;
           }
         )?.beyblade_id ?? "";
@@ -566,6 +577,17 @@ export default function Dashboard() {
           (bey) => {
             const beyName = normalizeDashes(bey.name.toLowerCase().trim());
             const csvName = normalizeDashes(beyBRaw.toLowerCase().trim());
+            if (i === startIndex && beyBRaw) {
+              console.log("Comparing Bey B:", {
+                csvOriginal: beyBRaw,
+                csvNormalized: csvName,
+                dbOriginal: bey.name,
+                dbNormalized: beyName,
+                match: beyName === csvName,
+                csvChars: Array.from(beyBRaw).map(c => `${c} (${c.charCodeAt(0)})`),
+                dbChars: Array.from(bey.name).map(c => `${c} (${c.charCodeAt(0)})`)
+              });
+            }
             return beyName === csvName;
           }
         )?.beyblade_id ?? "";
