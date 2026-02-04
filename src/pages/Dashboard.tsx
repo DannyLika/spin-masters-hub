@@ -504,11 +504,11 @@ export default function Dashboard() {
       }
       const beyAIdFromName =
         (inventoryOptions[playerAId] ?? []).find(
-          (bey) => bey.name.toLowerCase() === beyARaw.toLowerCase()
+          (bey) => bey.name.toLowerCase().trim() === beyARaw.toLowerCase().trim()
         )?.beyblade_id ?? "";
       const beyBIdFromName =
         (inventoryOptions[playerBId] ?? []).find(
-          (bey) => bey.name.toLowerCase() === beyBRaw.toLowerCase()
+          (bey) => bey.name.toLowerCase().trim() === beyBRaw.toLowerCase().trim()
         )?.beyblade_id ?? "";
 
       if (!playerAId) {
@@ -517,11 +517,13 @@ export default function Dashboard() {
       if (!playerBId) {
         warnings.push(`Row ${i + 1}: Player "${playerBRaw}" not found`);
       }
-      if (!beyAIdFromName) {
-        warnings.push(`Row ${i + 1}: Bey "${beyARaw}" not found for ${playerARaw}`);
+      if (!beyAIdFromName && playerAId) {
+        const available = (inventoryOptions[playerAId] ?? []).map(b => b.name).join(", ");
+        warnings.push(`Row ${i + 1}: Bey "${beyARaw}" not found for ${playerARaw}. Available: ${available || "none"}`);
       }
-      if (!beyBIdFromName) {
-        warnings.push(`Row ${i + 1}: Bey "${beyBRaw}" not found for ${playerBRaw}`);
+      if (!beyBIdFromName && playerBId) {
+        const available = (inventoryOptions[playerBId] ?? []).map(b => b.name).join(", ");
+        warnings.push(`Row ${i + 1}: Bey "${beyBRaw}" not found for ${playerBRaw}. Available: ${available || "none"}`);
       }
 
       rows.push({
