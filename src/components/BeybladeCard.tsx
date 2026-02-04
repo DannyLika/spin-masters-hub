@@ -51,11 +51,6 @@ export function BeybladeCard({
         <div className={cn("absolute inset-0 bg-gradient-to-br opacity-10", typeColors[type])} />
       </div>
 
-      {/* Spinning indicator */}
-      <div className="absolute -right-8 -top-8 w-24 h-24 opacity-20 group-hover:opacity-40 transition-opacity">
-        <div className="w-full h-full rounded-full border-4 border-dashed border-primary animate-spin-slow" />
-      </div>
-
       <div className="relative z-10">
         {/* Header */}
         <div className="flex items-start justify-between mb-3">
