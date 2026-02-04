@@ -443,6 +443,29 @@ export default function Dashboard() {
       headerCells.includes("extreme_knockouts") ||
       headerCells.includes("spin_finishes");
 
+    // Create column index map from header
+    const getColumnIndex = (name: string): number => {
+      const normalized = name.toLowerCase().replace(/_/g, "");
+      return headerCells.findIndex((h) => {
+        const normalizedHeader = h.replace(/_/g, "");
+        return h === name.toLowerCase() || normalizedHeader === normalized;
+      });
+    };
+
+    const matchIdIdx = hasHeader ? getColumnIndex("match_id") : 0;
+    const player1Idx = hasHeader ? getColumnIndex("player1") : 1;
+    const player1BeyIdx = hasHeader ? getColumnIndex("player1_bey") : 2;
+    const player1ScoreIdx = hasHeader ? getColumnIndex("player1_score") : 3;
+    const player2Idx = hasHeader ? getColumnIndex("player2") : 4;
+    const player2BeyIdx = hasHeader ? getColumnIndex("player2_bey") : 5;
+    const player2ScoreIdx = hasHeader ? getColumnIndex("player2_score") : 6;
+    const winnerIdx = hasHeader ? getColumnIndex("winner") : 7;
+    const dateIdx = hasHeader ? getColumnIndex("date") : 8;
+    const burstsIdx = hasHeader ? getColumnIndex("bursts") : 9;
+    const knockoutsIdx = hasHeader ? getColumnIndex("knockouts") : 10;
+    const extremeKnockoutsIdx = hasHeader ? getColumnIndex("extreme_knockouts") : 11;
+    const spinFinishesIdx = hasHeader ? getColumnIndex("spin_finishes") : 12;
+
     const startIndex = hasHeader ? 1 : 0;
     const rows: {
       id: string;
@@ -472,21 +495,20 @@ export default function Dashboard() {
         warnings.push(`Row ${i + 1}: Skipped (not enough columns)`);
         continue;
       }
-      const [
-        matchIdRaw,
-        playerARaw,
-        beyARaw,
-        scoreARaw,
-        playerBRaw,
-        beyBRaw,
-        scoreBRaw,
-        winnerRaw,
-        dateRaw = "",
-        burstsRaw = "0",
-        knockoutsRaw = "0",
-        extremeKnockoutsRaw = "0",
-        spinFinishesRaw = "0",
-      ] = cells;
+      
+      const matchIdRaw = cells[matchIdIdx] || "";
+      const playerARaw = cells[player1Idx] || "";
+      const beyARaw = cells[player1BeyIdx] || "";
+      const scoreARaw = cells[player1ScoreIdx] || "";
+      const playerBRaw = cells[player2Idx] || "";
+      const beyBRaw = cells[player2BeyIdx] || "";
+      const scoreBRaw = cells[player2ScoreIdx] || "";
+      const winnerRaw = cells[winnerIdx] || "";
+      const dateRaw = cells[dateIdx] || "";
+      const burstsRaw = cells[burstsIdx] || "0";
+      const knockoutsRaw = cells[knockoutsIdx] || "0";
+      const extremeKnockoutsRaw = cells[extremeKnockoutsIdx] || "0";
+      const spinFinishesRaw = cells[spinFinishesIdx] || "0";
       const playerAId =
         players.find((player) => player.display_name.toLowerCase() === playerARaw.toLowerCase())
           ?.id ?? "";
