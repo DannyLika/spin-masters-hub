@@ -3,7 +3,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Navbar } from "@/components/Navbar";
 import { StatsCard } from "@/components/StatsCard";
 import { RecentBattle } from "@/components/RecentBattle";
-import { Trophy, Swords, Target, TrendingUp, Award } from "lucide-react";
+import { Trophy, Swords, Target, TrendingUp, Award, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { normalizeBeybladeName } from "@/lib/beybladeUtils";
@@ -47,29 +47,6 @@ export default function Dashboard() {
   const [recentBattles, setRecentBattles] = useState<RecentBattleItem[]>([]);
   const [totals, setTotals] = useState({ battles: 0, players: 0, beyblades: 0 });
   const [isLoading, setIsLoading] = useState(true);
-  const [mode, setMode] = useState<"single" | "csv">("single");
-  const [csvSummary, setCsvSummary] = useState<string>("");
-  const [playerAId, setPlayerAId] = useState("");
-  const [playerBId, setPlayerBId] = useState("");
-  const [beyAId, setBeyAId] = useState("");
-  const [beyBId, setBeyBId] = useState("");
-  const [winner, setWinner] = useState<"A" | "B">("A");
-  const [scoreA, setScoreA] = useState("1");
-  const [scoreB, setScoreB] = useState("0");
-  const [burstCount, setBurstCount] = useState("0");
-  const [knockoutCount, setKnockoutCount] = useState("0");
-  const [extremeKnockoutCount, setExtremeKnockoutCount] = useState("0");
-  const [spinFinishCount, setSpinFinishCount] = useState("0");
-  const [location, setLocation] = useState("");
-
-  const inventoryForPlayerA = useMemo(
-    () => inventoryOptions[playerAId] ?? [],
-    [inventoryOptions, playerAId]
-  );
-  const inventoryForPlayerB = useMemo(
-    () => inventoryOptions[playerBId] ?? [],
-    [inventoryOptions, playerBId]
-  );
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -732,205 +709,23 @@ export default function Dashboard() {
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-8">
-              {/* Battle Logger */}
+              {/* Battle Logger - Removed, use CSV Editor instead */}
               <section>
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="font-display text-2xl font-bold text-foreground">
                     Log <span className="text-gradient-accent">Battles</span>
                   </h2>
+                  <Button variant="default" asChild>
+                    <Link to="/csv-editor">
+                      <Upload className="w-4 h-4 mr-2" />
+                      Open CSV Editor
+                    </Link>
+                  </Button>
                 </div>
-                <div className="rounded-xl bg-gradient-card border border-border p-6 space-y-4">
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <div className="flex-1">
-                      <label className="text-xs text-muted-foreground mb-1 block">Mode</label>
-                      <select
-                        value={mode}
-                        onChange={(event) => {
-                          setMode(event.target.value as "single" | "csv");
-                          setCsvSummary("");
-                        }}
-                        className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
-                      >
-                        <option value="single">Single battle</option>
-                        <option value="csv">CSV upload</option>
-                      </select>
-                    </div>
-                    <div className="flex-1">
-                      <label className="text-xs text-muted-foreground mb-1 block">Location</label>
-                      <input
-                        value={location}
-                        onChange={(event) => setLocation(event.target.value)}
-                        className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
-                        placeholder="Living room arena"
-                      />
-                    </div>
-                  </div>
-
-                  {mode === "single" && (
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-xs text-muted-foreground block">Blader A</label>
-                        <select
-                          value={playerAId}
-                          onChange={(event) => {
-                            setPlayerAId(event.target.value);
-                            setBeyAId("");
-                          }}
-                          className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
-                        >
-                          <option value="">Choose blader...</option>
-                          {players.map((player) => (
-                            <option key={player.id} value={player.id}>
-                              {player.display_name}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          value={beyAId}
-                          onChange={(event) => setBeyAId(event.target.value)}
-                          className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
-                        >
-                          <option value="">Choose Beyblade...</option>
-                          {inventoryForPlayerA.map((bey) => (
-                            <option key={bey.beyblade_id} value={bey.beyblade_id}>
-                              {bey.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs text-muted-foreground block">Blader B</label>
-                        <select
-                          value={playerBId}
-                          onChange={(event) => {
-                            setPlayerBId(event.target.value);
-                            setBeyBId("");
-                          }}
-                          className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
-                        >
-                          <option value="">Choose blader...</option>
-                          {players.map((player) => (
-                            <option key={player.id} value={player.id}>
-                              {player.display_name}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          value={beyBId}
-                          onChange={(event) => setBeyBId(event.target.value)}
-                          className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
-                        >
-                          <option value="">Choose Beyblade...</option>
-                          {inventoryForPlayerB.map((bey) => (
-                            <option key={bey.beyblade_id} value={bey.beyblade_id}>
-                              {bey.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  )}
-
-                  {mode === "single" ? (
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-xs text-muted-foreground block">Winner</label>
-                        <select
-                          value={winner}
-                          onChange={(event) => setWinner(event.target.value as "A" | "B")}
-                          className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
-                        >
-                          <option value="A">Blader A</option>
-                          <option value="B">Blader B</option>
-                        </select>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-xs text-muted-foreground block">Score A</label>
-                          <input
-                            value={scoreA}
-                            onChange={(event) => setScoreA(event.target.value)}
-                            className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground block">Score B</label>
-                          <input
-                            value={scoreB}
-                            onChange={(event) => setScoreB(event.target.value)}
-                            className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-4 gap-2 md:col-span-2">
-                        <div>
-                          <label className="text-xs text-muted-foreground block">Bursts</label>
-                          <input
-                            value={burstCount}
-                            onChange={(event) => setBurstCount(event.target.value)}
-                            className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground block">Knockouts</label>
-                          <input
-                            value={knockoutCount}
-                            onChange={(event) => setKnockoutCount(event.target.value)}
-                            className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground block">Extreme KO</label>
-                          <input
-                            value={extremeKnockoutCount}
-                            onChange={(event) => setExtremeKnockoutCount(event.target.value)}
-                            className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground block">Spin Finishes</label>
-                          <input
-                            value={spinFinishCount}
-                            onChange={(event) => setSpinFinishCount(event.target.value)}
-                            className="h-10 w-full rounded-lg bg-secondary border border-border px-3 text-sm text-foreground"
-                          />
-                        </div>
-                      </div>
-                      <Button variant="default" className="md:col-span-2" onClick={handleLogBattle}>
-                        Log Battle
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="rounded-lg border border-dashed border-border p-6 space-y-4">
-                        <div>
-                          <h3 className="text-sm font-medium mb-2">CSV Import</h3>
-                          <p className="text-xs text-muted-foreground mb-4">
-                            Import battles from <code className="px-1 py-0.5 bg-secondary rounded">batch-import.csv</code>.
-                            The file should have these columns:
-                          </p>
-                          <p className="text-xs font-mono text-muted-foreground mb-2">
-                            match_id, player1, player1_bey, player1_score, player2, player2_bey,
-                            player2_score, winner, date, bursts, knockouts, extreme_knockouts,
-                            spin_finishes
-                          </p>
-                          <Link to="/csv-editor" className="text-xs text-primary hover:underline mb-4 block">
-                            → Open CSV Editor (with autocomplete)
-                          </Link>
-                          <Button variant="default" onClick={handleBatchImport}>
-                            Import and Log CSV
-                          </Button>
-                        </div>
-                        {csvSummary && (
-                          <div className="mt-4 p-4 rounded-lg bg-secondary border border-border">
-                            <pre className="text-xs font-mono whitespace-pre-wrap text-foreground">
-                              {csvSummary}
-                            </pre>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                <div className="rounded-xl bg-gradient-card border border-border p-6">
+                  <p className="text-muted-foreground text-center py-8">
+                    Use the CSV Editor to log battles. Click "Open CSV Editor" above.
+                  </p>
                 </div>
               </section>
 

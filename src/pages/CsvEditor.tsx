@@ -40,6 +40,9 @@ export default function CsvEditor() {
   const [isLoading, setIsLoading] = useState(true);
   const [player1Filter, setPlayer1Filter] = useState<Record<string, string>>({});
   const [player2Filter, setPlayer2Filter] = useState<Record<string, string>>({});
+  const [inventoryOptions, setInventoryOptions] = useState<Record<string, { id: string; beyblade_id: string; name: string }[]>>({});
+  const [importSummary, setImportSummary] = useState<string>("");
+  const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -49,13 +52,32 @@ export default function CsvEditor() {
 
     const loadData = async () => {
       setIsLoading(true);
-      const [playersRes, beybladesRes] = await Promise.all([
+      const [playersRes, beybladesRes, inventoryRes] = await Promise.all([
         supabase.from("players").select("id, display_name").order("display_name"),
         supabase.from("beyblades").select("id, name, normalized_name").order("name"),
+        supabase
+          .from("player_beyblades")
+          .select("id, player_id, beyblade_id, beyblades(name)")
+          .order("created_at", { ascending: false }),
       ]);
 
       if (playersRes.data) setPlayers(playersRes.data);
       if (beybladesRes.data) setBeyblades(beybladesRes.data);
+      
+      // Build inventory map
+      const inventoryMap: Record<string, { id: string; beyblade_id: string; name: string }[]> = {};
+      (inventoryRes.data ?? []).forEach((entry) => {
+        const name = entry.beyblades?.name ?? "Unknown Bey";
+        if (!inventoryMap[entry.player_id]) {
+          inventoryMap[entry.player_id] = [];
+        }
+        inventoryMap[entry.player_id].push({
+          id: entry.id,
+          beyblade_id: entry.beyblade_id,
+          name,
+        });
+      });
+      setInventoryOptions(inventoryMap);
 
       // Load existing CSV
       try {
@@ -175,6 +197,225 @@ export default function CsvEditor() {
     window.URL.revokeObjectURL(url);
   };
 
+  const getNextMatchId = async () => {
+    const { data } = await supabase
+      .from("matches")
+      .select("external_id")
+      .not("external_id", "is", null)
+      .order("external_id", { ascending: false })
+      .limit(1);
+    
+    if (!data || data.length === 0) {
+      return "match-001";
+    }
+    
+    const lastId = data[0].external_id;
+    const match = lastId.match(/match-(\d+)/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      return `match-${String(num + 1).padStart(3, "0")}`;
+    }
+    return "match-001";
+  };
+
+  const handleImport = async () => {
+    if (!isSupabaseConfigured) {
+      window.alert("Supabase is not configured.");
+      return;
+    }
+
+    if (rows.length === 0) {
+      window.alert("No rows to import.");
+      return;
+    }
+
+    setIsImporting(true);
+    setImportSummary("Processing...");
+
+    let successCount = 0;
+    let updateCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+
+    for (const row of rows) {
+      if (!row.matchId || !row.player1 || !row.player2 || !row.player1Bey || !row.player2Bey) {
+        errorCount++;
+        errors.push(`Row ${row.id}: Missing required fields`);
+        continue;
+      }
+
+      const player1Id = players.find((p) => p.display_name === row.player1)?.id;
+      const player2Id = players.find((p) => p.display_name === row.player2)?.id;
+
+      if (!player1Id || !player2Id) {
+        errorCount++;
+        errors.push(`Row ${row.id}: Player not found`);
+        continue;
+      }
+
+      // Find Beyblades in player inventories
+      const player1Bey = (inventoryOptions[player1Id] ?? []).find(
+        (bey) => normalizeBeybladeName(bey.name) === normalizeBeybladeName(row.player1Bey)
+      );
+      const player2Bey = (inventoryOptions[player2Id] ?? []).find(
+        (bey) => normalizeBeybladeName(bey.name) === normalizeBeybladeName(row.player2Bey)
+      );
+
+      if (!player1Bey || !player2Bey) {
+        errorCount++;
+        errors.push(`Row ${row.id}: Beyblade not found in player inventory`);
+        continue;
+      }
+
+      const winnerId = row.winner === row.player1 ? player1Id : row.winner === row.player2 ? player2Id : player1Id;
+      const scoreA = Number(row.player1Score) || 0;
+      const scoreB = Number(row.player2Score) || 0;
+
+      // Parse date
+      let playedAt: Date;
+      if (row.date) {
+        const dateMatch = row.date.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (dateMatch) {
+          const [, month, day, year] = dateMatch;
+          playedAt = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        } else {
+          playedAt = new Date(row.date);
+        }
+      } else {
+        playedAt = new Date();
+      }
+
+      // Check if match exists
+      const { data: existingMatch } = await supabase
+        .from("matches")
+        .select("id")
+        .eq("external_id", row.matchId)
+        .maybeSingle();
+
+      const isUpdate = !!existingMatch;
+
+      // Upsert match
+      const { data: matchData, error: matchError } = await supabase
+        .from("matches")
+        .upsert(
+          {
+            id: existingMatch?.id,
+            external_id: row.matchId,
+            played_at: Number.isNaN(playedAt.getTime()) ? new Date().toISOString() : playedAt.toISOString(),
+            format: "best_of",
+            winner_player_id: winnerId,
+          },
+          { onConflict: "external_id" }
+        )
+        .select("id")
+        .single();
+
+      if (matchError || !matchData) {
+        errorCount++;
+        errors.push(`Row ${row.id}: ${matchError?.message ?? "Failed to create/update match"}`);
+        continue;
+      }
+
+      // Delete old participants if updating
+      if (isUpdate) {
+        await supabase.from("match_participants").delete().eq("match_id", matchData.id);
+        await supabase.from("match_events").delete().eq("match_id", matchData.id);
+      }
+
+      // Insert participants
+      const { error: participantError } = await supabase.from("match_participants").insert([
+        {
+          match_id: matchData.id,
+          player_id: player1Id,
+          beyblade_id: player1Bey.beyblade_id,
+          score: scoreA,
+          is_winner: winnerId === player1Id,
+        },
+        {
+          match_id: matchData.id,
+          player_id: player2Id,
+          beyblade_id: player2Bey.beyblade_id,
+          score: scoreB,
+          is_winner: winnerId === player2Id,
+        },
+      ]);
+
+      if (participantError) {
+        errorCount++;
+        errors.push(`Row ${row.id}: ${participantError.message}`);
+        continue;
+      }
+
+      // Insert events
+      const bursts = Number(row.bursts) || 0;
+      const knockouts = Number(row.knockouts) || 0;
+      const extremeKnockouts = Number(row.extremeKnockouts) || 0;
+      const spinFinishes = Number(row.spinFinishes) || 0;
+
+      const eventRows = [
+        { event_type: "burst", count: bursts },
+        { event_type: "knockout", count: knockouts },
+        { event_type: "extreme_knockout", count: extremeKnockouts },
+        { event_type: "spin_finish", count: spinFinishes },
+      ]
+        .filter((event) => event.count > 0)
+        .map((event) => ({
+          match_id: matchData.id,
+          event_type: event.event_type,
+          count: event.count,
+        }));
+
+      if (eventRows.length > 0) {
+        const { error: eventError } = await supabase.from("match_events").insert(eventRows);
+        if (eventError) {
+          errorCount++;
+          errors.push(`Row ${row.id}: ${eventError.message}`);
+          continue;
+        }
+      }
+
+      if (isUpdate) {
+        updateCount++;
+      } else {
+        successCount++;
+      }
+    }
+
+    const summary = [
+      `Import Complete`,
+      `Total rows: ${rows.length}`,
+      `✅ Created: ${successCount}`,
+      `🔄 Updated: ${updateCount}`,
+      `❌ Errors: ${errorCount}`,
+      ...(errors.length > 0 ? [`\nErrors:\n${errors.slice(0, 10).join("\n")}${errors.length > 10 ? `\n... and ${errors.length - 10} more` : ""}`] : []),
+    ].join("\n");
+
+    setImportSummary(summary);
+
+    // Clear table and prepopulate first row
+    const nextMatchId = await getNextMatchId();
+    const newRow: CsvRow = {
+      id: `row-${Date.now()}`,
+      matchId: nextMatchId,
+      player1: "",
+      player1Bey: "",
+      player1Score: "0",
+      player2: "",
+      player2Bey: "",
+      player2Score: "0",
+      winner: "",
+      date: new Date().toLocaleDateString("en-US"),
+      bursts: "0",
+      knockouts: "0",
+      extremeKnockouts: "0",
+      spinFinishes: "0",
+    };
+    setRows([newRow]);
+    setPlayer1Filter({});
+    setPlayer2Filter({});
+    setIsImporting(false);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -205,11 +446,23 @@ export default function CsvEditor() {
               <Plus className="w-4 h-4 mr-2" />
               Add Row
             </Button>
+            <Button onClick={handleImport} variant="default" disabled={isImporting || rows.length === 0}>
+              <Upload className="w-4 h-4 mr-2" />
+              {isImporting ? "Importing..." : "Import"}
+            </Button>
             <Button onClick={exportCsv} variant="outline">
               <Download className="w-4 h-4 mr-2" />
               Export CSV
             </Button>
           </div>
+
+          {importSummary && (
+            <div className="mb-4 p-4 rounded-lg bg-secondary border border-border">
+              <pre className="text-xs font-mono whitespace-pre-wrap text-foreground">
+                {importSummary}
+              </pre>
+            </div>
+          )}
 
           <div className="rounded-lg border border-border overflow-hidden bg-background">
             <div className="overflow-x-auto max-h-[calc(100vh-300px)]">
