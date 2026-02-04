@@ -154,15 +154,28 @@ export default function CsvEditor() {
     setRows(rows.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
   };
 
-  const getFilteredBeyblades = (rowId: string, isPlayer1: boolean) => {
-    const filterKey = isPlayer1 ? player1Filter[rowId] || "" : player2Filter[rowId] || "";
-    const search = filterKey.toLowerCase();
-    if (!search) return beyblades.slice(0, 20);
+  const getFilteredBeyblades = (row: CsvRow, isPlayer1: boolean) => {
+    const playerName = isPlayer1 ? row.player1 : row.player2;
+    const playerId = players.find((p) => p.display_name === playerName)?.id;
     
-    return beyblades
+    // If no player selected, return empty
+    if (!playerId) return [];
+    
+    // Get inventory for this player
+    const playerInventory = inventoryOptions[playerId] || [];
+    
+    // Filter by search term if provided
+    const filterKey = isPlayer1 ? player1Filter[row.id] || "" : player2Filter[row.id] || "";
+    const search = filterKey.toLowerCase();
+    
+    if (!search) {
+      return playerInventory.slice(0, 20);
+    }
+    
+    return playerInventory
       .filter((bey) => {
         const name = bey.name.toLowerCase();
-        const normalized = (bey.normalized_name || normalizeBeybladeName(bey.name)).toLowerCase();
+        const normalized = normalizeBeybladeName(bey.name).toLowerCase();
         return name.includes(search) || normalized.includes(search);
       })
       .slice(0, 20);
@@ -493,9 +506,10 @@ export default function CsvEditor() {
                       </td>
                     </tr>
                   ) : (
-                    rows.map((row) => {
-                      const player1BeyOptions = getFilteredBeyblades(row.id, true);
-                      const player2BeyOptions = getFilteredBeyblades(row.id, false);
+                    rows.map((row, rowIndex) => {
+                      const player1BeyOptions = getFilteredBeyblades(row, true);
+                      const player2BeyOptions = getFilteredBeyblades(row, false);
+                      const isLastRow = rowIndex === rows.length - 1;
 
                       return (
                         <tr key={row.id} className="border-b border-border hover:bg-secondary/30">
@@ -512,9 +526,10 @@ export default function CsvEditor() {
                               value={row.player1}
                               onChange={(e) => {
                                 updateRow(row.id, "player1", e.target.value);
+                                updateRow(row.id, "player1Bey", ""); // Clear bey when player changes
                                 setPlayer1Filter({ ...player1Filter, [row.id]: "" });
                               }}
-                              className="w-full h-7 bg-transparent border-0 px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary rounded cursor-pointer"
+                              className="w-full h-7 bg-secondary border-0 px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary rounded cursor-pointer"
                             >
                               <option value="">-</option>
                               {players.map((p) => (
@@ -561,9 +576,10 @@ export default function CsvEditor() {
                               value={row.player2}
                               onChange={(e) => {
                                 updateRow(row.id, "player2", e.target.value);
+                                updateRow(row.id, "player2Bey", ""); // Clear bey when player changes
                                 setPlayer2Filter({ ...player2Filter, [row.id]: "" });
                               }}
-                              className="w-full h-7 bg-transparent border-0 px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary rounded cursor-pointer"
+                              className="w-full h-7 bg-secondary border-0 px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary rounded cursor-pointer"
                             >
                               <option value="">-</option>
                               {players.map((p) => (
@@ -653,6 +669,12 @@ export default function CsvEditor() {
                               type="number"
                               value={row.spinFinishes}
                               onChange={(e) => updateRow(row.id, "spinFinishes", e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && isLastRow) {
+                                  e.preventDefault();
+                                  addRow();
+                                }
+                              }}
                               className="w-full h-7 bg-transparent border-0 px-1.5 text-xs text-foreground text-right focus:outline-none focus:ring-1 focus:ring-primary rounded"
                             />
                           </td>
