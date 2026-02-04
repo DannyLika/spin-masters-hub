@@ -151,7 +151,11 @@ export default function CsvEditor() {
   };
 
   const updateRow = (id: string, field: keyof CsvRow, value: string) => {
-    setRows(rows.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+    setRows((prevRows) => prevRows.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+  };
+
+  const updateRowMultiple = (id: string, updates: Partial<CsvRow>) => {
+    setRows((prevRows) => prevRows.map((r) => (r.id === id ? { ...r, ...updates } : r)));
   };
 
   const getFilteredBeyblades = (row: CsvRow, isPlayer1: boolean) => {
@@ -525,9 +529,9 @@ export default function CsvEditor() {
                             <select
                               value={row.player1}
                               onChange={(e) => {
-                                updateRow(row.id, "player1", e.target.value);
-                                updateRow(row.id, "player1Bey", ""); // Clear bey when player changes
-                                setPlayer1Filter({ ...player1Filter, [row.id]: "" });
+                                const newValue = e.target.value;
+                                updateRowMultiple(row.id, { player1: newValue, player1Bey: "" });
+                                setPlayer1Filter((prev) => ({ ...prev, [row.id]: "" }));
                               }}
                               className="w-full h-7 bg-secondary border-0 px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary rounded cursor-pointer"
                             >
@@ -575,9 +579,9 @@ export default function CsvEditor() {
                             <select
                               value={row.player2}
                               onChange={(e) => {
-                                updateRow(row.id, "player2", e.target.value);
-                                updateRow(row.id, "player2Bey", ""); // Clear bey when player changes
-                                setPlayer2Filter({ ...player2Filter, [row.id]: "" });
+                                const newValue = e.target.value;
+                                updateRowMultiple(row.id, { player2: newValue, player2Bey: "" });
+                                setPlayer2Filter((prev) => ({ ...prev, [row.id]: "" }));
                               }}
                               className="w-full h-7 bg-secondary border-0 px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary rounded cursor-pointer"
                             >
