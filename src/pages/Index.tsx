@@ -202,7 +202,7 @@ export default function Index() {
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button variant="hero" size="lg" asChild>
-              <Link to="/dashboard">
+              <Link to="/csv-editor">
                 <Plus className="w-5 h-5 mr-2" />
                 Log a Battle
               </Link>

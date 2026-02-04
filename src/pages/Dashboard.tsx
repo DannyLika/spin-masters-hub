@@ -153,12 +153,6 @@ export default function Dashboard() {
     };
   }, []);
 
-  useEffect(() => {
-    if (playerAId && playerBId && playerAId === playerBId) {
-      setPlayerBId("");
-      setBeyBId("");
-    }
-  }, [playerAId, playerBId]);
 
   const createMatch = async ({
     winnerId,
@@ -756,9 +750,11 @@ export default function Dashboard() {
               <div className="rounded-xl bg-gradient-card border border-border p-6">
                 <h3 className="font-display text-lg font-bold text-foreground mb-4">Quick Actions</h3>
                 <div className="space-y-3">
-                  <Button variant="default" className="w-full justify-start">
-                    <Swords className="w-4 h-4 mr-2" />
-                    Log New Battle
+                  <Button variant="default" className="w-full justify-start" asChild>
+                    <Link to="/csv-editor">
+                      <Swords className="w-4 h-4 mr-2" />
+                      Log New Battle
+                    </Link>
                   </Button>
                   <Button variant="ghost" className="w-full justify-start">
                     <Award className="w-4 h-4 mr-2" />
