@@ -211,31 +211,31 @@ export default function CsvEditor() {
             </Button>
           </div>
 
-          <div className="rounded-xl bg-gradient-card border border-border overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Match ID</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Player 1</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Bey 1</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Score 1</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Player 2</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Bey 2</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Score 2</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Winner</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Date</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Bursts</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">KOs</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Extreme KOs</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Spin Finishes</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground"></th>
+          <div className="rounded-lg border border-border overflow-hidden bg-background">
+            <div className="overflow-x-auto max-h-[calc(100vh-300px)]">
+              <table className="w-full border-collapse">
+                <thead className="sticky top-0 z-10 bg-secondary border-b-2 border-border">
+                  <tr>
+                    <th className="px-2 py-1.5 text-left text-xs font-semibold text-foreground border-r border-border bg-secondary/95">Match ID</th>
+                    <th className="px-2 py-1.5 text-left text-xs font-semibold text-foreground border-r border-border bg-secondary/95">Player 1</th>
+                    <th className="px-2 py-1.5 text-left text-xs font-semibold text-foreground border-r border-border bg-secondary/95">Bey 1</th>
+                    <th className="px-2 py-1.5 text-left text-xs font-semibold text-foreground border-r border-border bg-secondary/95 w-16">Score 1</th>
+                    <th className="px-2 py-1.5 text-left text-xs font-semibold text-foreground border-r border-border bg-secondary/95">Player 2</th>
+                    <th className="px-2 py-1.5 text-left text-xs font-semibold text-foreground border-r border-border bg-secondary/95">Bey 2</th>
+                    <th className="px-2 py-1.5 text-left text-xs font-semibold text-foreground border-r border-border bg-secondary/95 w-16">Score 2</th>
+                    <th className="px-2 py-1.5 text-left text-xs font-semibold text-foreground border-r border-border bg-secondary/95">Winner</th>
+                    <th className="px-2 py-1.5 text-left text-xs font-semibold text-foreground border-r border-border bg-secondary/95 w-24">Date</th>
+                    <th className="px-2 py-1.5 text-left text-xs font-semibold text-foreground border-r border-border bg-secondary/95 w-16">Bursts</th>
+                    <th className="px-2 py-1.5 text-left text-xs font-semibold text-foreground border-r border-border bg-secondary/95 w-16">KOs</th>
+                    <th className="px-2 py-1.5 text-left text-xs font-semibold text-foreground border-r border-border bg-secondary/95 w-20">Extreme KOs</th>
+                    <th className="px-2 py-1.5 text-left text-xs font-semibold text-foreground border-r border-border bg-secondary/95 w-20">Spin Finishes</th>
+                    <th className="px-1 py-1.5 text-left text-xs font-semibold text-foreground bg-secondary/95 w-10"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.length === 0 ? (
                     <tr>
-                      <td colSpan={14} className="px-4 py-8 text-center text-muted-foreground">
+                      <td colSpan={14} className="px-4 py-8 text-center text-muted-foreground border-r border-border">
                         No rows yet. Click "Add Row" to get started.
                       </td>
                     </tr>
@@ -245,25 +245,25 @@ export default function CsvEditor() {
                       const player2BeyOptions = getFilteredBeyblades(row.id, false);
 
                       return (
-                        <tr key={row.id} className="border-b border-border hover:bg-secondary/50">
-                          <td className="px-4 py-2">
+                        <tr key={row.id} className="border-b border-border hover:bg-secondary/30">
+                          <td className="px-1 py-0.5 border-r border-border">
                             <input
                               value={row.matchId}
                               onChange={(e) => updateRow(row.id, "matchId", e.target.value)}
-                              className="w-full h-9 rounded-lg bg-secondary border border-border px-2 text-sm text-foreground"
+                              className="w-full h-7 bg-transparent border-0 px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary rounded"
                               placeholder="match-001"
                             />
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-0.5 border-r border-border">
                             <select
                               value={row.player1}
                               onChange={(e) => {
                                 updateRow(row.id, "player1", e.target.value);
                                 setPlayer1Filter({ ...player1Filter, [row.id]: "" });
                               }}
-                              className="w-full h-9 rounded-lg bg-secondary border border-border px-2 text-sm text-foreground"
+                              className="w-full h-7 bg-transparent border-0 px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary rounded cursor-pointer"
                             >
-                              <option value="">Select...</option>
+                              <option value="">-</option>
                               {players.map((p) => (
                                 <option key={p.id} value={p.display_name}>
                                   {p.display_name}
@@ -271,7 +271,7 @@ export default function CsvEditor() {
                               ))}
                             </select>
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-0.5 border-r border-border">
                             <div className="relative">
                               <input
                                 value={row.player1Bey}
@@ -284,8 +284,8 @@ export default function CsvEditor() {
                                     setPlayer1Filter({ ...player1Filter, [row.id]: row.player1Bey });
                                   }
                                 }}
-                                className="w-full h-9 rounded-lg bg-secondary border border-border px-2 text-sm text-foreground"
-                                placeholder="Type to search..."
+                                className="w-full h-7 bg-transparent border-0 px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary rounded"
+                                placeholder="Type..."
                                 list={`bey1-${row.id}`}
                               />
                               <datalist id={`bey1-${row.id}`}>
@@ -295,24 +295,24 @@ export default function CsvEditor() {
                               </datalist>
                             </div>
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-0.5 border-r border-border">
                             <input
                               type="number"
                               value={row.player1Score}
                               onChange={(e) => updateRow(row.id, "player1Score", e.target.value)}
-                              className="w-full h-9 rounded-lg bg-secondary border border-border px-2 text-sm text-foreground"
+                              className="w-full h-7 bg-transparent border-0 px-1.5 text-xs text-foreground text-right focus:outline-none focus:ring-1 focus:ring-primary rounded"
                             />
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-0.5 border-r border-border">
                             <select
                               value={row.player2}
                               onChange={(e) => {
                                 updateRow(row.id, "player2", e.target.value);
                                 setPlayer2Filter({ ...player2Filter, [row.id]: "" });
                               }}
-                              className="w-full h-9 rounded-lg bg-secondary border border-border px-2 text-sm text-foreground"
+                              className="w-full h-7 bg-transparent border-0 px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary rounded cursor-pointer"
                             >
-                              <option value="">Select...</option>
+                              <option value="">-</option>
                               {players.map((p) => (
                                 <option key={p.id} value={p.display_name}>
                                   {p.display_name}
@@ -320,7 +320,7 @@ export default function CsvEditor() {
                               ))}
                             </select>
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-0.5 border-r border-border">
                             <div className="relative">
                               <input
                                 value={row.player2Bey}
@@ -333,8 +333,8 @@ export default function CsvEditor() {
                                     setPlayer2Filter({ ...player2Filter, [row.id]: row.player2Bey });
                                   }
                                 }}
-                                className="w-full h-9 rounded-lg bg-secondary border border-border px-2 text-sm text-foreground"
-                                placeholder="Type to search..."
+                                className="w-full h-7 bg-transparent border-0 px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary rounded"
+                                placeholder="Type..."
                                 list={`bey2-${row.id}`}
                               />
                               <datalist id={`bey2-${row.id}`}>
@@ -344,73 +344,73 @@ export default function CsvEditor() {
                               </datalist>
                             </div>
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-0.5 border-r border-border">
                             <input
                               type="number"
                               value={row.player2Score}
                               onChange={(e) => updateRow(row.id, "player2Score", e.target.value)}
-                              className="w-full h-9 rounded-lg bg-secondary border border-border px-2 text-sm text-foreground"
+                              className="w-full h-7 bg-transparent border-0 px-1.5 text-xs text-foreground text-right focus:outline-none focus:ring-1 focus:ring-primary rounded"
                             />
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-0.5 border-r border-border">
                             <select
                               value={row.winner}
                               onChange={(e) => updateRow(row.id, "winner", e.target.value)}
-                              className="w-full h-9 rounded-lg bg-secondary border border-border px-2 text-sm text-foreground"
+                              className="w-full h-7 bg-transparent border-0 px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary rounded cursor-pointer"
                             >
-                              <option value="">Select...</option>
+                              <option value="">-</option>
                               <option value={row.player1}>{row.player1 || "Player 1"}</option>
                               <option value={row.player2}>{row.player2 || "Player 2"}</option>
                             </select>
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-0.5 border-r border-border">
                             <input
                               value={row.date}
                               onChange={(e) => updateRow(row.id, "date", e.target.value)}
-                              className="w-full h-9 rounded-lg bg-secondary border border-border px-2 text-sm text-foreground"
+                              className="w-full h-7 bg-transparent border-0 px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary rounded"
                               placeholder="2/3/2026"
                             />
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-0.5 border-r border-border">
                             <input
                               type="number"
                               value={row.bursts}
                               onChange={(e) => updateRow(row.id, "bursts", e.target.value)}
-                              className="w-full h-9 rounded-lg bg-secondary border border-border px-2 text-sm text-foreground"
+                              className="w-full h-7 bg-transparent border-0 px-1.5 text-xs text-foreground text-right focus:outline-none focus:ring-1 focus:ring-primary rounded"
                             />
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-0.5 border-r border-border">
                             <input
                               type="number"
                               value={row.knockouts}
                               onChange={(e) => updateRow(row.id, "knockouts", e.target.value)}
-                              className="w-full h-9 rounded-lg bg-secondary border border-border px-2 text-sm text-foreground"
+                              className="w-full h-7 bg-transparent border-0 px-1.5 text-xs text-foreground text-right focus:outline-none focus:ring-1 focus:ring-primary rounded"
                             />
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-0.5 border-r border-border">
                             <input
                               type="number"
                               value={row.extremeKnockouts}
                               onChange={(e) => updateRow(row.id, "extremeKnockouts", e.target.value)}
-                              className="w-full h-9 rounded-lg bg-secondary border border-border px-2 text-sm text-foreground"
+                              className="w-full h-7 bg-transparent border-0 px-1.5 text-xs text-foreground text-right focus:outline-none focus:ring-1 focus:ring-primary rounded"
                             />
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-0.5 border-r border-border">
                             <input
                               type="number"
                               value={row.spinFinishes}
                               onChange={(e) => updateRow(row.id, "spinFinishes", e.target.value)}
-                              className="w-full h-9 rounded-lg bg-secondary border border-border px-2 text-sm text-foreground"
+                              className="w-full h-7 bg-transparent border-0 px-1.5 text-xs text-foreground text-right focus:outline-none focus:ring-1 focus:ring-primary rounded"
                             />
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-0.5">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => removeRow(row.id)}
-                              className="text-destructive hover:text-destructive"
+                              className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </Button>
                           </td>
                         </tr>
