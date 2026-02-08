@@ -414,7 +414,10 @@ export default function CsvEditor() {
       const scoreA = Number(row.player1Score) || 0;
       const scoreB = Number(row.player2Score) || 0;
       // Auto-determine winner from score (higher score wins, tie goes to player1)
-      const winnerId = scoreA > scoreB ? player1Id : scoreB > scoreA ? player2Id : player1Id;
+      // Only set winner if at least one score is non-zero
+      const winnerId = (scoreA === 0 && scoreB === 0) 
+        ? null 
+        : (scoreA > scoreB ? player1Id : scoreB > scoreA ? player2Id : player1Id);
 
       // Parse date
       let playedAt: Date;
@@ -448,7 +451,7 @@ export default function CsvEditor() {
             external_id: row.matchId,
             played_at: Number.isNaN(playedAt.getTime()) ? new Date().toISOString() : playedAt.toISOString(),
             format: "best_of",
-            winner_player_id: winnerId,
+            winner_player_id: winnerId || null,
           },
           { onConflict: "external_id" }
         )

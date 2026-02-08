@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface BeybladeCardProps {
   name: string;
@@ -8,6 +10,7 @@ interface BeybladeCardProps {
   stamina: number | null;
   wins: number;
   losses: number;
+  notes?: string | null;
   imageUrl?: string;
   className?: string;
 }
@@ -34,10 +37,13 @@ export function BeybladeCard({
   stamina,
   wins,
   losses,
+  notes,
   className,
 }: BeybladeCardProps) {
+  const [isNotesExpanded, setIsNotesExpanded] = useState(false);
   const winRate = wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
   const hasStats = attack !== null && defense !== null && stamina !== null;
+  const hasNotes = notes && notes.trim().length > 0;
 
   return (
     <div
@@ -95,6 +101,28 @@ export function BeybladeCard({
         {!hasStats && (
           <div className="text-xs text-muted-foreground mt-2">
             Performance stats not set.
+          </div>
+        )}
+
+        {/* Notes Section */}
+        {hasNotes && (
+          <div className="mt-3 border-t border-border pt-3">
+            <button
+              onClick={() => setIsNotesExpanded(!isNotesExpanded)}
+              className="flex items-center gap-2 w-full text-left text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {isNotesExpanded ? (
+                <ChevronUp className="w-3 h-3" />
+              ) : (
+                <ChevronDown className="w-3 h-3" />
+              )}
+              <span>Notes</span>
+            </button>
+            {isNotesExpanded && (
+              <div className="mt-2 text-xs text-foreground whitespace-pre-wrap bg-secondary/30 rounded p-2">
+                {notes}
+              </div>
+            )}
           </div>
         )}
       </div>

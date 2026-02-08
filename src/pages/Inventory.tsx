@@ -21,6 +21,8 @@ type BeybladeWithStats = BeybladeRow & {
   type: BeyType;
   wins: number;
   losses: number;
+  notes: string | null;
+  playerBeybladeId: string;
 };
 
 type PlayerRow = {
@@ -35,6 +37,7 @@ type PlayerBeybladeRow = {
   attack: number | null;
   defense: number | null;
   stamina: number | null;
+  notes: string | null;
   beyblades: BeybladeRow | null;
 };
 
@@ -58,6 +61,7 @@ export default function Inventory() {
   const [statsDrafts, setStatsDrafts] = useState<
     Record<string, { attack: string; defense: string; stamina: string }>
   >({});
+  const [notesDrafts, setNotesDrafts] = useState<Record<string, string>>({});
 
   const loadBaseData = useCallback(async () => {
     setIsLoading(true);
@@ -107,7 +111,7 @@ export default function Inventory() {
         supabase
           .from("player_beyblades")
           .select(
-            "id, player_id, beyblade_id, attack, defense, stamina, beyblades(id, name, type, attack, defense, stamina)"
+            "id, player_id, beyblade_id, attack, defense, stamina, notes, beyblades(id, name, type, attack, defense, stamina)"
           )
           .eq("player_id", playerId),
         supabase
@@ -177,6 +181,8 @@ export default function Inventory() {
             type: normalizedType,
             wins: stats.wins,
             losses: stats.losses,
+            notes: entry.notes,
+            playerBeybladeId: entry.id,
           } satisfies BeybladeWithStats;
         })
         .filter((entry): entry is BeybladeWithStats => Boolean(entry));
@@ -433,7 +439,7 @@ export default function Inventory() {
                   ))}
                 </select>
                 <Button variant="default" onClick={handleAddBeyblade}>
-                  <Plus className="w-4 h-4 mr-2" />
+              <Plus className="w-4 h-4 mr-2" />
                   Add Bey to Catalog
                 </Button>
               </div>
@@ -478,7 +484,7 @@ export default function Inventory() {
                     disabled={!selectedCatalogBey || !selectedPlayerId}
                   >
                     Add
-                  </Button>
+            </Button>
                 </div>
               </div>
             </div>
@@ -560,6 +566,7 @@ export default function Inventory() {
               const needsStats =
                 bey.attack === null || bey.defense === null || bey.stamina === null;
               const draft = statsDrafts[bey.id] ?? { attack: "", defense: "", stamina: "" };
+              const notesDraft = notesDrafts[bey.id] ?? bey.notes ?? "";
 
               return (
                 <div key={bey.id} className={viewMode === "list" ? "space-y-2" : ""}>
@@ -609,6 +616,27 @@ export default function Inventory() {
                       </Button>
                     </div>
                   )}
+                  <div className="mt-2">
+                    <textarea
+                      value={notesDraft}
+                      onChange={(event) =>
+                        setNotesDrafts((prev) => ({
+                          ...prev,
+                          [bey.id]: event.target.value,
+                        }))
+                      }
+                      className="w-full min-h-[60px] rounded-lg bg-secondary border border-border px-2 py-1.5 text-xs text-foreground resize-y"
+                      placeholder="Add notes about this Beyblade..."
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-1"
+                      onClick={() => handleSaveNotes(bey.id)}
+                    >
+                      Save Notes
+                    </Button>
+                  </div>
                 </div>
               );
             })}
