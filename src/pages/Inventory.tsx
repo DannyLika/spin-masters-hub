@@ -103,17 +103,45 @@ export default function Inventory() {
 
       setIsLoading(true);
 
+      // Try to fetch with notes first, fall back to without notes if column doesn't exist
+      let inventoryData: any[] | null = null;
+      let inventoryError: any = null;
+      
+      const inventoryWithNotes = await supabase
+        .from("player_beyblades")
+        .select(
+          "id, player_id, beyblade_id, attack, defense, stamina, notes, beyblades(id, name, type, attack, defense, stamina)"
+        )
+        .eq("player_id", playerId);
+      
+      // If notes column doesn't exist (error code 42703 or message contains "notes"), try without it
+      if (inventoryWithNotes.error && (
+        inventoryWithNotes.error.code === "42703" || 
+        inventoryWithNotes.error.message?.toLowerCase().includes("notes") ||
+        inventoryWithNotes.error.message?.toLowerCase().includes("column")
+      )) {
+        console.warn("Notes column not found, falling back to query without notes:", inventoryWithNotes.error);
+        const inventoryWithoutNotes = await supabase
+          .from("player_beyblades")
+          .select(
+            "id, player_id, beyblade_id, attack, defense, stamina, beyblades(id, name, type, attack, defense, stamina)"
+          )
+          .eq("player_id", playerId);
+        inventoryData = inventoryWithoutNotes.data;
+        inventoryError = inventoryWithoutNotes.error;
+        // Add null notes to each entry for compatibility
+        if (inventoryData) {
+          inventoryData = inventoryData.map(entry => ({ ...entry, notes: null }));
+        }
+      } else {
+        inventoryData = inventoryWithNotes.data;
+        inventoryError = inventoryWithNotes.error;
+      }
+
       const [
-        { data: inventoryData, error: inventoryError },
         { data: recordData, error: recordError },
         { data: beyStatsData, error: beyStatsError },
       ] = await Promise.all([
-        supabase
-          .from("player_beyblades")
-          .select(
-            "id, player_id, beyblade_id, attack, defense, stamina, notes, beyblades(id, name, type, attack, defense, stamina)"
-          )
-          .eq("player_id", playerId),
         supabase
           .from("match_participants")
           .select("is_winner")
@@ -181,7 +209,7 @@ export default function Inventory() {
             type: normalizedType,
             wins: stats.wins,
             losses: stats.losses,
-            notes: entry.notes,
+            notes: entry.notes ?? null,
             playerBeybladeId: entry.id,
           } satisfies BeybladeWithStats;
         })
