@@ -79,7 +79,15 @@ export default function CsvEditor() {
       });
       setInventoryOptions(inventoryMap);
 
-      // Load existing CSV
+      // Get existing match IDs from database to avoid loading already-imported matches
+      const { data: existingMatches } = await supabase
+        .from("matches")
+        .select("external_id")
+        .not("external_id", "is", null);
+      
+      const existingMatchIds = new Set((existingMatches ?? []).map(m => m.external_id));
+
+      // Load existing CSV, but filter out matches that already exist in DB
       try {
         const response = await fetch(`/batch-import.csv?ts=${Date.now()}`);
         if (response.ok) {
@@ -95,16 +103,27 @@ export default function CsvEditor() {
                   const idx = headerCells.findIndex((h) => h === name.toLowerCase() || h === name.toLowerCase().replace("_", ""));
                   return idx >= 0 && idx < cells.length ? cells[idx] : "";
                 };
+                const matchId = getCol("match_id");
+                // Skip if match already exists in database
+                if (matchId && existingMatchIds.has(matchId)) {
+                  continue;
+                }
+                const player1Score = Number(getCol("player1_score")) || 0;
+                const player2Score = Number(getCol("player2_score")) || 0;
+                const player1 = getCol("player1");
+                const player2 = getCol("player2");
+                // Auto-determine winner from score
+                const winner = player1Score > player2Score ? player1 : player2Score > player1Score ? player2 : player1;
                 dataRows.push({
                   id: `row-${i}`,
-                  matchId: getCol("match_id"),
-                  player1: getCol("player1"),
+                  matchId,
+                  player1,
                   player1Bey: getCol("player1_bey"),
-                  player1Score: getCol("player1_score"),
-                  player2: getCol("player2"),
+                  player1Score: String(player1Score),
+                  player2,
                   player2Bey: getCol("player2_bey"),
-                  player2Score: getCol("player2_score"),
-                  winner: getCol("winner"),
+                  player2Score: String(player2Score),
+                  winner,
                   date: getCol("date"),
                   bursts: getCol("bursts") || "0",
                   knockouts: getCol("knockouts") || "0",
@@ -113,11 +132,95 @@ export default function CsvEditor() {
                 });
               }
             }
+            // If no rows from CSV (all already imported), start with a new row
+            if (dataRows.length === 0) {
+              const nextMatchId = await getNextMatchId();
+              const stevanPlayer = playersRes.data?.find(p => p.display_name === "Stevan");
+              const maxPlayer = playersRes.data?.find(p => p.display_name === "Max");
+              dataRows.push({
+                id: `row-${Date.now()}`,
+                matchId: nextMatchId,
+                player1: stevanPlayer?.display_name || "",
+                player1Bey: "",
+                player1Score: "0",
+                player2: maxPlayer?.display_name || "",
+                player2Bey: "",
+                player2Score: "0",
+                winner: "",
+                date: new Date().toLocaleDateString("en-US"),
+                bursts: "0",
+                knockouts: "0",
+                extremeKnockouts: "0",
+                spinFinishes: "0",
+              });
+            }
             setRows(dataRows);
+          } else {
+            // CSV is empty, start with a new row
+            const nextMatchId = await getNextMatchId();
+            const stevanPlayer = playersRes.data?.find(p => p.display_name === "Stevan");
+            const maxPlayer = playersRes.data?.find(p => p.display_name === "Max");
+            setRows([{
+              id: `row-${Date.now()}`,
+              matchId: nextMatchId,
+              player1: stevanPlayer?.display_name || "",
+              player1Bey: "",
+              player1Score: "0",
+              player2: maxPlayer?.display_name || "",
+              player2Bey: "",
+              player2Score: "0",
+              winner: "",
+              date: new Date().toLocaleDateString("en-US"),
+              bursts: "0",
+              knockouts: "0",
+              extremeKnockouts: "0",
+              spinFinishes: "0",
+            }]);
           }
+        } else {
+          // CSV file not found, start with a new row
+          const nextMatchId = await getNextMatchId();
+          const stevanPlayer = playersRes.data?.find(p => p.display_name === "Stevan");
+          const maxPlayer = playersRes.data?.find(p => p.display_name === "Max");
+          setRows([{
+            id: `row-${Date.now()}`,
+            matchId: nextMatchId,
+            player1: stevanPlayer?.display_name || "",
+            player1Bey: "",
+            player1Score: "0",
+            player2: maxPlayer?.display_name || "",
+            player2Bey: "",
+            player2Score: "0",
+            winner: "",
+            date: new Date().toLocaleDateString("en-US"),
+            bursts: "0",
+            knockouts: "0",
+            extremeKnockouts: "0",
+            spinFinishes: "0",
+          }]);
         }
       } catch (error) {
         console.error("Failed to load CSV:", error);
+        // On error, start with a new row
+        const nextMatchId = await getNextMatchId();
+        const stevanPlayer = playersRes.data?.find(p => p.display_name === "Stevan");
+        const maxPlayer = playersRes.data?.find(p => p.display_name === "Max");
+        setRows([{
+          id: `row-${Date.now()}`,
+          matchId: nextMatchId,
+          player1: stevanPlayer?.display_name || "",
+          player1Bey: "",
+          player1Score: "0",
+          player2: maxPlayer?.display_name || "",
+          player2Bey: "",
+          player2Score: "0",
+          winner: "",
+          date: new Date().toLocaleDateString("en-US"),
+          bursts: "0",
+          knockouts: "0",
+          extremeKnockouts: "0",
+          spinFinishes: "0",
+        }]);
       }
 
       setIsLoading(false);
@@ -126,14 +229,17 @@ export default function CsvEditor() {
     loadData();
   }, []);
 
-  const addRow = () => {
+  const addRow = async () => {
+    const nextMatchId = await getNextMatchId();
+    const stevanPlayer = players.find(p => p.display_name === "Stevan");
+    const maxPlayer = players.find(p => p.display_name === "Max");
     const newRow: CsvRow = {
       id: `row-${Date.now()}`,
-      matchId: `match-${Date.now()}`,
-      player1: "",
+      matchId: nextMatchId,
+      player1: stevanPlayer?.display_name || "",
       player1Bey: "",
       player1Score: "0",
-      player2: "",
+      player2: maxPlayer?.display_name || "",
       player2Bey: "",
       player2Score: "0",
       winner: "",
@@ -151,7 +257,19 @@ export default function CsvEditor() {
   };
 
   const updateRow = (id: string, field: keyof CsvRow, value: string) => {
-    setRows((prevRows) => prevRows.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+    setRows((prevRows) => {
+      return prevRows.map((r) => {
+        if (r.id !== id) return r;
+        const updated = { ...r, [field]: value };
+        // Auto-calculate winner when scores change
+        if (field === "player1Score" || field === "player2Score") {
+          const score1 = Number(updated.player1Score) || 0;
+          const score2 = Number(updated.player2Score) || 0;
+          updated.winner = score1 > score2 ? updated.player1 : score2 > score1 ? updated.player2 : updated.player1;
+        }
+        return updated;
+      });
+    });
   };
 
   const updateRowMultiple = (id: string, updates: Partial<CsvRow>) => {
@@ -214,7 +332,7 @@ export default function CsvEditor() {
     window.URL.revokeObjectURL(url);
   };
 
-  const getNextMatchId = async () => {
+  const getNextMatchId = async (): Promise<string> => {
     const { data } = await supabase
       .from("matches")
       .select("external_id")
@@ -284,9 +402,10 @@ export default function CsvEditor() {
         continue;
       }
 
-      const winnerId = row.winner === row.player1 ? player1Id : row.winner === row.player2 ? player2Id : player1Id;
       const scoreA = Number(row.player1Score) || 0;
       const scoreB = Number(row.player2Score) || 0;
+      // Auto-determine winner from score (higher score wins, tie goes to player1)
+      const winnerId = scoreA > scoreB ? player1Id : scoreB > scoreA ? player2Id : player1Id;
 
       // Parse date
       let playedAt: Date;
@@ -409,15 +528,17 @@ export default function CsvEditor() {
 
     setImportSummary(summary);
 
-    // Clear table and prepopulate first row
+    // Clear table and prepopulate first row with default players
     const nextMatchId = await getNextMatchId();
+    const stevanPlayer = players.find(p => p.display_name === "Stevan");
+    const maxPlayer = players.find(p => p.display_name === "Max");
     const newRow: CsvRow = {
       id: `row-${Date.now()}`,
       matchId: nextMatchId,
-      player1: "",
+      player1: stevanPlayer?.display_name || "",
       player1Bey: "",
       player1Score: "0",
-      player2: "",
+      player2: maxPlayer?.display_name || "",
       player2Bey: "",
       player2Score: "0",
       winner: "",
@@ -626,15 +747,13 @@ export default function CsvEditor() {
                             />
                           </td>
                           <td className="px-1 py-0.5 border-r border-border">
-                            <select
-                              value={row.winner}
-                              onChange={(e) => updateRow(row.id, "winner", e.target.value)}
-                              className="w-full h-7 bg-transparent border-0 px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary rounded cursor-pointer"
-                            >
-                              <option value="">-</option>
-                              <option value={row.player1}>{row.player1 || "Player 1"}</option>
-                              <option value={row.player2}>{row.player2 || "Player 2"}</option>
-                            </select>
+                            <input
+                              type="text"
+                              value={row.winner || (Number(row.player1Score) > Number(row.player2Score) ? row.player1 : Number(row.player2Score) > Number(row.player1Score) ? row.player2 : row.player1)}
+                              readOnly
+                              className="w-full h-7 bg-secondary/50 border-0 px-1.5 text-xs text-foreground rounded cursor-not-allowed"
+                              title="Winner is automatically determined by score"
+                            />
                           </td>
                           <td className="px-1 py-0.5 border-r border-border">
                             <input
