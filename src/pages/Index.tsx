@@ -65,15 +65,21 @@ export default function Index() {
     const loadDashboard = async () => {
       setIsLoading(true);
 
-      const [{ data: beyData, error: beyError }, { data: participantData, error: participantError }] =
-        await Promise.all([
-          supabase
-            .from("beyblades")
-            .select("id, name, type, attack, defense, stamina"),
-          supabase
-            .from("match_participants")
-            .select("beyblade_id, is_winner"),
-        ]);
+      const [
+        { data: beyData, error: beyError },
+        { data: participantData, error: participantError },
+        { data: playerBeyData, error: playerBeyError },
+      ] = await Promise.all([
+        supabase
+          .from("beyblades")
+          .select("id, name, type, attack, defense, stamina"),
+        supabase
+          .from("match_participants")
+          .select("beyblade_id, is_winner"),
+        supabase
+          .from("player_beyblades")
+          .select("beyblade_id, attack, defense, stamina"),
+      ]);
 
       if (beyError) {
         console.error("Failed to load beyblades:", beyError);
@@ -81,6 +87,10 @@ export default function Index() {
 
       if (participantError) {
         console.error("Failed to load match participants:", participantError);
+      }
+
+      if (playerBeyError) {
+        console.error("Failed to load player beyblade stats:", playerBeyError);
       }
 
       const statsByBey = new Map<string, { wins: number; losses: number }>();
@@ -95,16 +105,40 @@ export default function Index() {
         statsByBey.set(participant.beyblade_id, current);
       });
 
+      // Create a map of best available stats per beyblade (prefer player-specific stats over catalog stats)
+      // If multiple players have set stats, we'll use the first non-null one we find
+      const statsByBeyId = new Map<string, { attack: number | null; defense: number | null; stamina: number | null }>();
+      (playerBeyData ?? []).forEach((entry) => {
+        if (!entry.beyblade_id) return;
+        const existing = statsByBeyId.get(entry.beyblade_id);
+        // Use player-specific stats if they exist and we don't already have stats for this bey
+        if (!existing && (entry.attack !== null || entry.defense !== null || entry.stamina !== null)) {
+          statsByBeyId.set(entry.beyblade_id, {
+            attack: entry.attack,
+            defense: entry.defense,
+            stamina: entry.stamina,
+          });
+        }
+      });
+
       const normalized = (beyData ?? []).map((bey) => {
         const normalizedType = allowedTypes.includes(bey.type as BeyType)
           ? (bey.type as BeyType)
           : "Balance";
         const stats = statsByBey.get(bey.id) ?? { wins: 0, losses: 0 };
+        // Use player-specific stats if available, otherwise use catalog stats
+        const playerStats = statsByBeyId.get(bey.id);
+        const attack = playerStats?.attack ?? bey.attack ?? null;
+        const defense = playerStats?.defense ?? bey.defense ?? null;
+        const stamina = playerStats?.stamina ?? bey.stamina ?? null;
         return {
           ...bey,
           type: normalizedType,
           wins: stats.wins,
           losses: stats.losses,
+          attack,
+          defense,
+          stamina,
         };
       });
 

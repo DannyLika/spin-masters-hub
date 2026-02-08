@@ -99,19 +99,26 @@ export default function Inventory() {
 
       setIsLoading(true);
 
-      const [{ data: inventoryData, error: inventoryError }, { data: recordData, error: recordError }] =
-        await Promise.all([
-          supabase
-            .from("player_beyblades")
-            .select(
-              "id, player_id, beyblade_id, attack, defense, stamina, beyblades(id, name, type, attack, defense, stamina)"
-            )
-            .eq("player_id", playerId),
-          supabase
-            .from("match_participants")
-            .select("is_winner")
-            .eq("player_id", playerId),
-        ]);
+      const [
+        { data: inventoryData, error: inventoryError },
+        { data: recordData, error: recordError },
+        { data: beyStatsData, error: beyStatsError },
+      ] = await Promise.all([
+        supabase
+          .from("player_beyblades")
+          .select(
+            "id, player_id, beyblade_id, attack, defense, stamina, beyblades(id, name, type, attack, defense, stamina)"
+          )
+          .eq("player_id", playerId),
+        supabase
+          .from("match_participants")
+          .select("is_winner")
+          .eq("player_id", playerId),
+        supabase
+          .from("match_participants")
+          .select("beyblade_id, is_winner")
+          .eq("player_id", playerId),
+      ]);
 
       if (inventoryError) {
         console.error("Failed to load inventory:", inventoryError);
@@ -119,6 +126,10 @@ export default function Inventory() {
 
       if (recordError) {
         console.error("Failed to load player record:", recordError);
+      }
+
+      if (beyStatsError) {
+        console.error("Failed to load beyblade stats:", beyStatsError);
       }
 
       const record = (recordData ?? []).reduce(
@@ -133,6 +144,19 @@ export default function Inventory() {
         { wins: 0, losses: 0 }
       );
 
+      // Calculate win/loss stats per beyblade
+      const statsByBey = new Map<string, { wins: number; losses: number }>();
+      (beyStatsData ?? []).forEach((participant) => {
+        if (!participant.beyblade_id) return;
+        const current = statsByBey.get(participant.beyblade_id) ?? { wins: 0, losses: 0 };
+        if (participant.is_winner) {
+          current.wins += 1;
+        } else {
+          current.losses += 1;
+        }
+        statsByBey.set(participant.beyblade_id, current);
+      });
+
       const normalized = (inventoryData ?? [])
         .map((entry) => {
           if (!entry.beyblades) return null;
@@ -143,6 +167,7 @@ export default function Inventory() {
           const attack = entry.attack ?? base.attack ?? null;
           const defense = entry.defense ?? base.defense ?? null;
           const stamina = entry.stamina ?? base.stamina ?? null;
+          const stats = statsByBey.get(base.id) ?? { wins: 0, losses: 0 };
 
           return {
             ...base,
@@ -150,8 +175,8 @@ export default function Inventory() {
             defense,
             stamina,
             type: normalizedType,
-            wins: 0,
-            losses: 0,
+            wins: stats.wins,
+            losses: stats.losses,
           } satisfies BeybladeWithStats;
         })
         .filter((entry): entry is BeybladeWithStats => Boolean(entry));
