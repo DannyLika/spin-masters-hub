@@ -261,11 +261,20 @@ export default function CsvEditor() {
       return prevRows.map((r) => {
         if (r.id !== id) return r;
         const updated = { ...r, [field]: value };
-        // Auto-calculate winner when scores change
+        // Auto-calculate winner when scores change (only if both scores are non-zero)
         if (field === "player1Score" || field === "player2Score") {
           const score1 = Number(updated.player1Score) || 0;
           const score2 = Number(updated.player2Score) || 0;
-          updated.winner = score1 > score2 ? updated.player1 : score2 > score1 ? updated.player2 : updated.player1;
+          if (score1 === 0 && score2 === 0) {
+            updated.winner = "";
+          } else if (score1 > score2) {
+            updated.winner = updated.player1;
+          } else if (score2 > score1) {
+            updated.winner = updated.player2;
+          } else {
+            // Tie - default to player1
+            updated.winner = updated.player1;
+          }
         }
         return updated;
       });
@@ -749,10 +758,18 @@ export default function CsvEditor() {
                           <td className="px-1 py-0.5 border-r border-border">
                             <input
                               type="text"
-                              value={row.winner || (Number(row.player1Score) > Number(row.player2Score) ? row.player1 : Number(row.player2Score) > Number(row.player1Score) ? row.player2 : row.player1)}
+                              value={(() => {
+                                const score1 = Number(row.player1Score) || 0;
+                                const score2 = Number(row.player2Score) || 0;
+                                if (score1 === 0 && score2 === 0) return "";
+                                if (score1 > score2) return row.player1;
+                                if (score2 > score1) return row.player2;
+                                return row.player1; // Tie
+                              })()}
                               readOnly
                               className="w-full h-7 bg-secondary/50 border-0 px-1.5 text-xs text-foreground rounded cursor-not-allowed"
                               title="Winner is automatically determined by score"
+                              placeholder="-"
                             />
                           </td>
                           <td className="px-1 py-0.5 border-r border-border">
